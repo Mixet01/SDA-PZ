@@ -3,186 +3,191 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Gestione Ore SDA Potenza - Web</title>
+  <title>I Miei Turni - SDA</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body data-today="{{ today_date }}" data-month="{{ current_month }}" data-google-client-id="{{ google_client_id }}">
   <section id="auth-gate" class="gate">
-    <h1 class="header">Accesso Gestione Ore SDA</h1>
-    <div class="box gate-box">
+    <h1 class="title-big">Accesso Gestione Turni</h1>
+    <div class="panel">
       {% if google_client_id %}
-      <p>Accedi con il tuo account Google aziendale/personale.</p>
+      <p class="sub">Accedi con Google</p>
       <div id="google-signin"></div>
       {% else %}
-      <p>Google Sign-In non configurato. Inserisci email per accesso locale di test.</p>
-      <div class="row">
+      <p class="sub">Google non configurato. Accesso di test:</p>
+      <div class="field-row">
         <input id="dev-name" type="text" placeholder="Nome">
         <input id="dev-email" type="email" placeholder="email@dominio.it">
-        <button id="dev-login">Accedi (dev)</button>
       </div>
+      <button id="dev-login" class="btn primary">Accedi</button>
       {% endif %}
     </div>
   </section>
 
   <section id="pending-gate" class="gate hidden">
-    <h1 class="header">Accesso In Attesa</h1>
-    <div class="box gate-box">
-      <p>Il tuo account e stato registrato ma non ancora approvato da un amministratore.</p>
-      <button id="pending-logout" class="secondary">Esci</button>
+    <h1 class="title-big">In Attesa Di Approvazione</h1>
+    <div class="panel">
+      <p class="sub">Il tuo account e in attesa di approvazione da parte dell'admin.</p>
+      <button id="pending-logout" class="btn secondary">Esci</button>
     </div>
   </section>
 
-  <div id="app-main" class="hidden">
-    <header class="user-bar">
-      <div id="current-user"></div>
-      <button id="logout-btn" class="secondary">Logout</button>
-    </header>
+  <div id="app-main" class="hidden app">
+    <input id="mese-selector" type="month" class="hidden-field">
 
-    <main class="app-shell">
-      <nav class="tabs">
-        <button class="tab-btn active" data-tab="tab-lavoro">Inserimento Turni</button>
-        <button class="tab-btn" data-tab="tab-quick">Turni Rapidi</button>
-        <button class="tab-btn" data-tab="tab-report">Report e Utility</button>
-        <button class="tab-btn" data-tab="tab-settings">Impostazioni Paghe</button>
-        <button id="admin-tab-btn" class="tab-btn hidden" data-tab="tab-admin">Admin Utenti</button>
-      </nav>
+    <main class="phone-shell">
+      <section id="screen-turni" class="screen active">
+        <header class="screen-head">
+          <h1>I Miei Turni</h1>
+          <p id="hello-user" class="sub">Ciao</p>
+        </header>
 
-      <section id="tab-lavoro" class="tab-panel active">
-        <h1 class="header">SDA Poste Italiane - Gestione Avanzata Turni</h1>
-        <p id="readonly-banner" class="readonly hidden"></p>
-        <button id="back-to-mine" class="secondary hidden">Torna ai miei turni</button>
+        <p id="readonly-banner" class="notice hidden"></p>
+        <button id="back-to-mine" class="btn secondary small hidden">Torna ai miei turni</button>
 
-        <div class="row row-tight">
-          <label for="mese-selector">Mese:</label>
-          <input id="mese-selector" type="month">
-          <button id="refresh-month">Aggiorna Mese</button>
+        <div class="month-nav">
+          <button id="month-prev" class="icon-btn" aria-label="Mese precedente">&#8249;</button>
+          <div id="month-label" class="month-label">Mese</div>
+          <button id="month-next" class="icon-btn" aria-label="Mese successivo">&#8250;</button>
         </div>
 
-        <section class="box">
-          <h2>Inserimento Rapido Turno</h2>
-          <div class="row form-grid">
-            <label for="shift-date">Data</label>
-            <input id="shift-date" type="date">
-            <label for="shift-start">Inizio</label>
-            <input id="shift-start" type="time" value="06:00">
-            <label for="shift-end">Fine</label>
-            <input id="shift-end" type="time" value="14:00">
-          </div>
+        <div class="stats-grid">
+          <article class="mini-card accent-green">
+            <span class="ico">💸</span>
+            <span class="cap">Totale</span>
+            <strong id="metric-total-eur">€0.00</strong>
+          </article>
+          <article class="mini-card accent-blue">
+            <span class="ico">🕒</span>
+            <span class="cap">Ore</span>
+            <strong id="metric-total-hours">0.0h</strong>
+          </article>
+          <article class="mini-card accent-yellow">
+            <span class="ico">📅</span>
+            <span class="cap">Turni</span>
+            <strong id="metric-total-shifts">0</strong>
+          </article>
+        </div>
 
-          <div class="row form-grid">
-            <label for="quick-main">Turno rapido</label>
-            <select id="quick-main">
-              <option value="">Seleziona turno rapido</option>
-            </select>
-            <button id="apply-main-quick">Applica Turno Rapido</button>
-            <button id="open-quick-tab" class="secondary">Gestisci Turni Rapidi</button>
-          </div>
-
-          <div class="row flags">
-            <label><input id="flag-festivo" type="checkbox"> Festivo lavorato (Goduto +8h automatico)</label>
-            <label><input id="flag-festivo-goduto" type="checkbox"> Festivo goduto (+8h)</label>
-            <label><input id="flag-ferie" type="checkbox"> Ferie</label>
-            <label><input id="flag-malattia" type="checkbox"> Malattia</label>
-          </div>
-
-          <div class="row">
-            <button id="add-shift">Aggiungi Turno</button>
-            <button id="delete-shift" class="danger">Elimina Turno Selezionato</button>
-          </div>
-          <p id="edit-label" class="hint">Nuovo inserimento: scegli data, orari o turno rapido e premi Aggiungi Turno.</p>
-        </section>
-
-        <section class="box table-wrap">
-          <table id="month-table">
-            <thead>
-              <tr>
-                <th>Data</th>
-                <th>Inizio</th>
-                <th>Fine</th>
-                <th>Totale EUR</th>
-                <th>Dettaglio Ore</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </section>
-
-        <pre id="summary-box" class="summary-box"></pre>
+        <div id="shift-list" class="shift-list"></div>
       </section>
 
-      <section id="tab-quick" class="tab-panel">
-        <h1 class="header">Gestione Turni Rapidi</h1>
-        <p class="hint">Crea, modifica o elimina preset veloci e applicali al giorno in compilazione.</p>
+      <section id="screen-paghe" class="screen">
+        <header class="screen-head">
+          <h1>Impostazioni Paghe</h1>
+          <p class="sub">Configura tariffe orarie</p>
+        </header>
 
-        <section class="box">
-          <h2>Dettaglio Turno Rapido</h2>
-          <div class="row form-grid">
-            <label for="quick-name">Nome</label>
+        <div id="settings-sections"></div>
+
+        <div class="panel">
+          <h3>Turni Rapidi</h3>
+          <div id="quick-list" class="quick-list"></div>
+          <div class="field-row">
             <input id="quick-name" type="text" placeholder="Nome turno rapido">
-            <label for="quick-start">Inizio</label>
+          </div>
+          <div class="field-row">
             <input id="quick-start" type="time" value="06:00">
-            <label for="quick-end">Fine</label>
             <input id="quick-end" type="time" value="14:00">
           </div>
-          <div class="row">
-            <button id="save-quick">Salva / Aggiorna</button>
-            <button id="new-quick" class="secondary">Nuovo</button>
-            <button id="delete-quick" class="danger">Elimina</button>
-            <button id="apply-quick-to-day">Applica al Giorno</button>
+          <div class="field-row">
+            <button id="save-quick" class="btn primary">Salva</button>
+            <button id="new-quick" class="btn secondary">Nuovo</button>
+            <button id="delete-quick" class="btn danger">Elimina</button>
           </div>
-        </section>
-
-        <section class="box table-wrap">
-          <table id="quick-table">
-            <thead>
-              <tr>
-                <th>Nome</th>
-                <th>Inizio</th>
-                <th>Fine</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </section>
-      </section>
-
-      <section id="tab-report" class="tab-panel">
-        <h1 class="header">Report Mensile, Export e Utility</h1>
-        <div class="row">
-          <button id="export-pdf">Esporta PDF del Mese</button>
-          <button id="export-backup">Esporta Backup JSON</button>
-          <button id="recalculate-all">Ricalcola Tutto lo Storico</button>
         </div>
-        <section class="box">
-          <textarea id="report-text" readonly></textarea>
-        </section>
+
+        <div class="field-row">
+          <button id="save-settings" class="btn primary wide">Salva Impostazioni</button>
+        </div>
       </section>
 
-      <section id="tab-settings" class="tab-panel">
-        <h1 class="header">Impostazioni Paghe</h1>
-        <section id="settings-box" class="box"></section>
-        <button id="save-settings">Salva Impostazioni</button>
+      <section id="screen-admin" class="screen">
+        <header class="screen-head">
+          <h1>Pannello Admin</h1>
+          <p class="sub">Gestione accessi utenti</p>
+        </header>
+
+        <div class="stats-grid admin-stats">
+          <article class="mini-card"><span class="ico">👥</span><span class="cap">Totali</span><strong id="admin-total">0</strong></article>
+          <article class="mini-card"><span class="ico">⏳</span><span class="cap">In attesa</span><strong id="admin-pending">0</strong></article>
+          <article class="mini-card"><span class="ico">✅</span><span class="cap">Approvati</span><strong id="admin-approved">0</strong></article>
+          <article class="mini-card"><span class="ico">🚫</span><span class="cap">Negati</span><strong id="admin-denied">0</strong></article>
+        </div>
+
+        <div class="chips">
+          <button class="chip active" data-admin-filter="all">Tutti</button>
+          <button class="chip" data-admin-filter="pending">In attesa</button>
+          <button class="chip" data-admin-filter="approved">Approvati</button>
+          <button class="chip" data-admin-filter="denied">Negati</button>
+        </div>
+
+        <div id="admin-users-list" class="admin-users-list"></div>
       </section>
 
-      <section id="tab-admin" class="tab-panel">
-        <h1 class="header">Gestione Utenti</h1>
-        <section class="box table-wrap">
-          <table id="admin-users-table">
-            <thead>
-              <tr>
-                <th>Utente</th>
-                <th>Ruolo</th>
-                <th>Stato</th>
-                <th>Turni</th>
-                <th>Ultimo Login</th>
-                <th>Azioni</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </section>
+      <section id="screen-profile" class="screen">
+        <header class="screen-head">
+          <h1>Riepilogo del Mese</h1>
+        </header>
+
+        <div class="stats-grid two-cols">
+          <article class="mini-card"><span class="ico">💰</span><strong id="profile-total-eur">€0.00</strong><span class="cap">Guadagno</span></article>
+          <article class="mini-card"><span class="ico">🕐</span><strong id="profile-total-hours">0.0h</strong><span class="cap">Ore Totali</span></article>
+          <article class="mini-card"><span class="ico">📆</span><strong id="profile-total-shifts">0</strong><span class="cap">Turni</span></article>
+          <article class="mini-card"><span class="ico">📈</span><strong id="profile-overtime">0.0h</strong><span class="cap">Straordinari</span></article>
+        </div>
+
+        <div class="panel">
+          <h3>Dettaglio Ore Mese</h3>
+          <div id="profile-breakdown" class="breakdown"></div>
+        </div>
+
+        <div class="field-row">
+          <button id="export-pdf" class="btn secondary">Export PDF</button>
+          <button id="export-backup" class="btn secondary">Backup</button>
+        </div>
+        <button id="logout-btn-profile" class="btn danger wide">Esci</button>
       </section>
     </main>
+
+    <button id="fab-add-turno" class="fab" aria-label="Aggiungi turno">+</button>
+
+    <nav class="bottom-nav">
+      <button class="nav-btn active" data-screen="screen-turni"><span>📅</span><small>Turni</small></button>
+      <button class="nav-btn" data-screen="screen-paghe"><span>💶</span><small>Paghe</small></button>
+      <button id="admin-nav-btn" class="nav-btn hidden" data-screen="screen-admin"><span>🛡️</span><small>Admin</small></button>
+      <button class="nav-btn" data-screen="screen-profile"><span>👤</span><small>Profilo</small></button>
+    </nav>
+  </div>
+
+  <div id="shift-modal" class="modal hidden">
+    <div class="modal-box">
+      <h3>Nuovo Turno</h3>
+      <div class="field-row">
+        <input id="shift-date" type="date">
+      </div>
+      <div class="field-row">
+        <input id="shift-start" type="time" value="06:00">
+        <input id="shift-end" type="time" value="14:00">
+      </div>
+      <div class="field-row">
+        <select id="quick-main">
+          <option value="">Turno rapido</option>
+        </select>
+        <button id="apply-main-quick" class="btn secondary">Applica</button>
+      </div>
+      <div class="flags-col">
+        <label><input id="flag-festivo" type="checkbox"> Festivo lavorato (+goduto)</label>
+        <label><input id="flag-festivo-goduto" type="checkbox"> Festivo goduto</label>
+        <label><input id="flag-ferie" type="checkbox"> Ferie</label>
+        <label><input id="flag-malattia" type="checkbox"> Malattia</label>
+      </div>
+      <p id="edit-label" class="sub">Compila i campi e salva.</p>
+      <div class="field-row">
+        <button id="add-shift" class="btn primary">Salva Turno</button>
+        <button id="modal-close" class="btn secondary">Chiudi</button>
+      </div>
+    </div>
   </div>
 
   {% if google_client_id %}
