@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+_tmp_test_auth/
+
+# Runtime data (locale)
+utenti_sda.json
+user_data/
+
+# Se usi dati seed locali, tienili fuori dal repo
+dati_sda.json

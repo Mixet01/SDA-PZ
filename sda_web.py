@@ -1,4 +1,5 @@
 import calendar
+import copy
 import json
 import os
 import re
@@ -11,45 +12,60 @@ from threading import Lock
 
 from flask import Flask, Response, g, jsonify, render_template, request, send_file, session
 
+try:
+    import psycopg
+    from psycopg.types.json import Jsonb
+except Exception:
+    psycopg = None
+    Jsonb = None
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_ROOT = os.environ.get("SDA_DATA_DIR", BASE_DIR).strip() or BASE_DIR
 if not os.path.isabs(DATA_ROOT):
     DATA_ROOT = os.path.abspath(os.path.join(BASE_DIR, DATA_ROOT))
 
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+DB_MODE = bool(DATABASE_URL)
+
 DATA_FILE = os.path.join(DATA_ROOT, "dati_sda.json")
 USERS_FILE = os.path.join(DATA_ROOT, "utenti_sda.json")
 USER_DATA_DIR = os.path.join(DATA_ROOT, "user_data")
 
+DEFAULT_SETTINGS = {
+    "BASE_GIORNO": 10,
+    "BASE_NOTTE": 12,
+    "OT_GIORNO": 14,
+    "OT_NOTTE": 16,
+    "SABATO_GIORNO": 13,
+    "SABATO_NOTTE": 15,
+    "FESTIVO_GIORNALIERO": 18,
+    "FESTIVO_NOTTURNO": 20,
+    "FERIE": 80,
+    "MALATTIA": 80,
+    "FESTIVO_GODUTO": 80,
+    "SOGLIA_STRAORDINARIO": 8,
+}
+
+DEFAULT_QUICK_SHIFTS = [
+    {"name": "Mattina", "start": "06:00", "end": "14:00"},
+    {"name": "Pomeriggio", "start": "14:00", "end": "22:00"},
+    {"name": "Notte", "start": "22:00", "end": "06:00"},
+    {"name": "Part-time Mattina", "start": "06:00", "end": "12:00"},
+    {"name": "Part-time Sera", "start": "18:00", "end": "22:00"},
+]
+
 
 class SDAEngine:
-    def __init__(self, data_file):
+    def __init__(self, data_file, user_email=None):
         self.data_file = data_file
-        self.settings = {
-            "BASE_GIORNO": 10,
-            "BASE_NOTTE": 12,
-            "OT_GIORNO": 14,
-            "OT_NOTTE": 16,
-            "SABATO_GIORNO": 13,
-            "SABATO_NOTTE": 15,
-            "FESTIVO_GIORNALIERO": 18,
-            "FESTIVO_NOTTURNO": 20,
-            "FERIE": 80,
-            "MALATTIA": 80,
-            "FESTIVO_GODUTO": 80,
-            "SOGLIA_STRAORDINARIO": 8,
-        }
+        self.user_email = user_email
+        self.settings = copy.deepcopy(DEFAULT_SETTINGS)
         self.data = []
         self.quick_shifts = self.default_quick_shifts()
         self.load_data()
 
     def default_quick_shifts(self):
-        return [
-            {"name": "Mattina", "start": "06:00", "end": "14:00"},
-            {"name": "Pomeriggio", "start": "14:00", "end": "22:00"},
-            {"name": "Notte", "start": "22:00", "end": "06:00"},
-            {"name": "Part-time Mattina", "start": "06:00", "end": "12:00"},
-            {"name": "Part-time Sera", "start": "18:00", "end": "22:00"},
-        ]
+        return copy.deepcopy(DEFAULT_QUICK_SHIFTS)
 
     def parse_time_or_default(self, value, fallback):
         try:
@@ -421,16 +437,16 @@ class SDAEngine:
             updated.append(self.build_entry(payload))
         self.data = sorted(updated, key=lambda x: x.get("date", ""))
 
-    def save_data(self):
-        with open(self.data_file, "w", encoding="utf-8") as f:
-            json.dump({"settings": self.settings, "quick_shifts": self.quick_shifts, "data": self.data}, f, indent=2)
+    def to_payload(self):
+        return {
+            "settings": self.settings,
+            "quick_shifts": self.quick_shifts,
+            "data": self.data,
+        }
 
-    def load_data(self):
-        if not os.path.exists(self.data_file):
-            self.quick_shifts = self.default_quick_shifts()
-            return
-        with open(self.data_file, "r", encoding="utf-8") as f:
-            content = json.load(f)
+    def apply_payload(self, payload):
+        content = payload or {}
+        self.settings = copy.deepcopy(DEFAULT_SETTINGS)
         self.settings.update(content.get("settings", {}))
         self.quick_shifts = self.sanitize_quick_shifts(content.get("quick_shifts"))
         self.data = content.get("data", [])
@@ -438,6 +454,25 @@ class SDAEngine:
             self.normalize_entry_flags(entry)
             entry["detail"] = entry.get("detail", {}) or {}
             entry["detail_minutes"] = self.get_detail_minutes(entry)
+
+    def save_data(self):
+        if DB_MODE and self.user_email:
+            db_save_user_payload(self.user_email, self.to_payload())
+            return
+        with open(self.data_file, "w", encoding="utf-8") as f:
+            json.dump(self.to_payload(), f, indent=2)
+
+    def load_data(self):
+        if DB_MODE and self.user_email:
+            payload = db_load_user_payload(self.user_email)
+            self.apply_payload(payload)
+            return
+        if not os.path.exists(self.data_file):
+            self.quick_shifts = self.default_quick_shifts()
+            return
+        with open(self.data_file, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+        self.apply_payload(payload)
 
 
 app = Flask(__name__, template_folder=os.path.join(BASE_DIR, "templates"), static_folder=os.path.join(BASE_DIR, "static"))
@@ -450,7 +485,193 @@ lock = Lock()
 os.makedirs(USER_DATA_DIR, exist_ok=True)
 
 
+def default_user_payload():
+    return {
+        "settings": copy.deepcopy(DEFAULT_SETTINGS),
+        "quick_shifts": copy.deepcopy(DEFAULT_QUICK_SHIFTS),
+        "data": [],
+    }
+
+
+def db_connect():
+    if psycopg is None:
+        raise RuntimeError("Driver PostgreSQL non disponibile. Installa 'psycopg[binary]'.")
+    return psycopg.connect(DATABASE_URL, autocommit=True, prepare_threshold=None)
+
+
+def ensure_db_schema():
+    if not DB_MODE:
+        return
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS app_users (
+                    email TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    picture TEXT NOT NULL DEFAULT '',
+                    role TEXT NOT NULL DEFAULT 'user',
+                    approved BOOLEAN NOT NULL DEFAULT FALSE,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    last_login TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+                """
+            )
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS app_user_payloads (
+                    email TEXT PRIMARY KEY REFERENCES app_users(email) ON DELETE CASCADE,
+                    payload JSONB NOT NULL,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+                """
+            )
+
+
+def db_load_users_registry():
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT email, name, picture, role, approved, created_at, last_login
+                FROM app_users
+                ORDER BY email
+                """
+            )
+            rows = cur.fetchall()
+    users = []
+    for row in rows:
+        users.append(
+            {
+                "email": row[0],
+                "name": row[1],
+                "picture": row[2] or "",
+                "role": row[3] or "user",
+                "approved": bool(row[4]),
+                "created_at": row[5].isoformat(timespec="seconds") if row[5] else "",
+                "last_login": row[6].isoformat(timespec="seconds") if row[6] else "",
+            }
+        )
+    return {"users": users}
+
+
+def db_save_user_record(user):
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO app_users (email, name, picture, role, approved, created_at, last_login)
+                VALUES (%s, %s, %s, %s, %s, COALESCE(%s, NOW()), COALESCE(%s, NOW()))
+                ON CONFLICT (email) DO UPDATE SET
+                    name = EXCLUDED.name,
+                    picture = EXCLUDED.picture,
+                    role = EXCLUDED.role,
+                    approved = EXCLUDED.approved,
+                    last_login = EXCLUDED.last_login
+                """,
+                (
+                    user["email"],
+                    user.get("name") or user["email"],
+                    user.get("picture", ""),
+                    user.get("role", "user"),
+                    bool(user.get("approved", False)),
+                    user.get("created_at"),
+                    user.get("last_login"),
+                ),
+            )
+
+
+def db_load_user_payload(email):
+    email = normalize_email(email)
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT payload FROM app_user_payloads WHERE email=%s", (email,))
+            row = cur.fetchone()
+
+    if not row:
+        payload = default_user_payload()
+        db_save_user_payload(email, payload)
+        return payload
+
+    raw = row[0]
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str):
+        try:
+            return json.loads(raw)
+        except Exception:
+            return default_user_payload()
+    return default_user_payload()
+
+
+def db_save_user_payload(email, payload):
+    email = normalize_email(email)
+    safe_payload = payload or default_user_payload()
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO app_user_payloads (email, payload, updated_at)
+                VALUES (%s, %s, NOW())
+                ON CONFLICT (email) DO UPDATE SET
+                    payload = EXCLUDED.payload,
+                    updated_at = NOW()
+                """,
+                (email, Jsonb(safe_payload)),
+            )
+
+
 def bootstrap_data_root():
+    if DB_MODE:
+        ensure_db_schema()
+        legacy_users_file = os.path.join(BASE_DIR, "utenti_sda.json")
+        legacy_user_dir = os.path.join(BASE_DIR, "user_data")
+        legacy_main_data = os.path.join(BASE_DIR, "dati_sda.json")
+
+        with db_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) FROM app_users")
+                count = int(cur.fetchone()[0] or 0)
+
+        if count > 0:
+            return
+
+        legacy_users = []
+        if os.path.exists(legacy_users_file):
+            with open(legacy_users_file, "r", encoding="utf-8") as f:
+                content = json.load(f)
+            legacy_users = content.get("users", []) if isinstance(content, dict) else []
+
+        for user in legacy_users:
+            email = str(user.get("email") or "").strip().lower()
+            if not email:
+                continue
+            db_save_user_record(
+                {
+                    "email": email,
+                    "name": user.get("name") or email,
+                    "picture": user.get("picture", ""),
+                    "role": user.get("role", "user"),
+                    "approved": bool(user.get("approved", False)),
+                    "created_at": user.get("created_at"),
+                    "last_login": user.get("last_login"),
+                }
+            )
+
+            payload = None
+            safe_slug = re.sub(r"[^a-zA-Z0-9_.-]", "_", email) or "user"
+            candidate = os.path.join(legacy_user_dir, f"dati_{safe_slug}.json")
+            if os.path.exists(candidate):
+                with open(candidate, "r", encoding="utf-8") as f:
+                    payload = json.load(f)
+            elif os.path.exists(legacy_main_data):
+                with open(legacy_main_data, "r", encoding="utf-8") as f:
+                    payload = json.load(f)
+            else:
+                payload = default_user_payload()
+            db_save_user_payload(email, payload)
+        return
+
     legacy_data = os.path.join(BASE_DIR, "dati_sda.json")
     legacy_users = os.path.join(BASE_DIR, "utenti_sda.json")
     legacy_user_dir = os.path.join(BASE_DIR, "user_data")
@@ -496,6 +717,8 @@ def user_data_path(email):
 
 
 def load_users_registry():
+    if DB_MODE:
+        return db_load_users_registry()
     if not os.path.exists(USERS_FILE):
         return {"users": []}
     with open(USERS_FILE, "r", encoding="utf-8") as f:
@@ -506,6 +729,10 @@ def load_users_registry():
 
 
 def save_users_registry(registry):
+    if DB_MODE:
+        for user in registry.get("users", []):
+            db_save_user_record(user)
+        return
     with open(USERS_FILE, "w", encoding="utf-8") as f:
         json.dump(registry, f, indent=2, ensure_ascii=False)
 
@@ -516,6 +743,13 @@ def find_user(registry, email):
 
 
 def ensure_user_data_seed(email, is_first_user):
+    if DB_MODE:
+        payload = db_load_user_payload(email)
+        if is_first_user and payload == default_user_payload() and os.path.exists(DATA_FILE):
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                legacy = json.load(f)
+            db_save_user_payload(email, legacy)
+        return
     path = user_data_path(email)
     if os.path.exists(path):
         return
@@ -596,7 +830,7 @@ def admin_required(fn):
 
 def get_engine_for(email):
     path = user_data_path(email)
-    return SDAEngine(path)
+    return SDAEngine(path, user_email=email)
 
 
 def resolve_view_user(current_user):
