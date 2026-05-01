@@ -225,6 +225,21 @@ table {
   min-width: 760px;
 }
 
+#month-table {
+  min-width: 560px;
+}
+
+#month-table th,
+#month-table td {
+  white-space: nowrap;
+}
+
+#month-table th:nth-child(5),
+#month-table td:nth-child(5) {
+  white-space: normal;
+  min-width: 180px;
+}
+
 th {
   background: var(--primary);
   color: #fff;
@@ -300,5 +315,26 @@ tbody tr.selectable.selected td {
 
   .setting-row {
     grid-template-columns: 1fr;
+  }
+
+  .app-shell {
+    padding: 8px;
+  }
+
+  #month-table {
+    min-width: 0;
+  }
+
+  #month-table th,
+  #month-table td {
+    padding: 5px;
+    font-size: 12px;
+  }
+
+  #month-table th:nth-child(5),
+  #month-table td:nth-child(5) {
+    min-width: 130px;
+    font-size: 11px;
+    line-height: 1.2;
   }
 }

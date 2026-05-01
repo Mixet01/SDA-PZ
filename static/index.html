@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gestione Ore SDA Potenza - Web</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body data-today="{{ today_date }}" data-month="{{ current_month }}" data-google-client-id="{{ google_client_id }}">
+  <section id="auth-gate" class="gate">
+    <h1 class="header">Accesso Gestione Ore SDA</h1>
+    <div class="box gate-box">
+      {% if google_client_id %}
+      <p>Accedi con il tuo account Google aziendale/personale.</p>
+      <div id="google-signin"></div>
+      {% else %}
+      <p>Google Sign-In non configurato. Inserisci email per accesso locale di test.</p>
+      <div class="row">
+        <input id="dev-name" type="text" placeholder="Nome">
+        <input id="dev-email" type="email" placeholder="email@dominio.it">
+        <button id="dev-login">Accedi (dev)</button>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section id="pending-gate" class="gate hidden">
+    <h1 class="header">Accesso In Attesa</h1>
+    <div class="box gate-box">
+      <p>Il tuo account e stato registrato ma non ancora approvato da un amministratore.</p>
+      <button id="pending-logout" class="secondary">Esci</button>
+    </div>
+  </section>
+
+  <div id="app-main" class="hidden">
+    <header class="user-bar">
+      <div id="current-user"></div>
+      <button id="logout-btn" class="secondary">Logout</button>
+    </header>
+
+    <main class="app-shell">
+      <nav class="tabs">
+        <button class="tab-btn active" data-tab="tab-lavoro">Inserimento Turni</button>
+        <button class="tab-btn" data-tab="tab-quick">Turni Rapidi</button>
+        <button class="tab-btn" data-tab="tab-report">Report e Utility</button>
+        <button class="tab-btn" data-tab="tab-settings">Impostazioni Paghe</button>
+        <button id="admin-tab-btn" class="tab-btn hidden" data-tab="tab-admin">Admin Utenti</button>
+      </nav>
+
+      <section id="tab-lavoro" class="tab-panel active">
+        <h1 class="header">SDA Poste Italiane - Gestione Avanzata Turni</h1>
+        <p id="readonly-banner" class="readonly hidden"></p>
+        <button id="back-to-mine" class="secondary hidden">Torna ai miei turni</button>
+
+        <div class="row row-tight">
+          <label for="mese-selector">Mese:</label>
+          <input id="mese-selector" type="month">
+          <button id="refresh-month">Aggiorna Mese</button>
+        </div>
+
+        <section class="box">
+          <h2>Inserimento Rapido Turno</h2>
+          <div class="row form-grid">
+            <label for="shift-date">Data</label>
+            <input id="shift-date" type="date">
+            <label for="shift-start">Inizio</label>
+            <input id="shift-start" type="time" value="06:00">
+            <label for="shift-end">Fine</label>
+            <input id="shift-end" type="time" value="14:00">
+          </div>
+
+          <div class="row form-grid">
+            <label for="quick-main">Turno rapido</label>
+            <select id="quick-main">
+              <option value="">Seleziona turno rapido</option>
+            </select>
+            <button id="apply-main-quick">Applica Turno Rapido</button>
+            <button id="open-quick-tab" class="secondary">Gestisci Turni Rapidi</button>
+          </div>
+
+          <div class="row flags">
+            <label><input id="flag-festivo" type="checkbox"> Festivo lavorato (Goduto +8h automatico)</label>
+            <label><input id="flag-festivo-goduto" type="checkbox"> Festivo goduto (+8h)</label>
+            <label><input id="flag-ferie" type="checkbox"> Ferie</label>
+            <label><input id="flag-malattia" type="checkbox"> Malattia</label>
+          </div>
+
+          <div class="row">
+            <button id="add-shift">Aggiungi Turno</button>
+            <button id="delete-shift" class="danger">Elimina Turno Selezionato</button>
+          </div>
+          <p id="edit-label" class="hint">Nuovo inserimento: scegli data, orari o turno rapido e premi Aggiungi Turno.</p>
+        </section>
+
+        <section class="box table-wrap">
+          <table id="month-table">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Inizio</th>
+                <th>Fine</th>
+                <th>Totale EUR</th>
+                <th>Dettaglio Ore</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </section>
+
+        <pre id="summary-box" class="summary-box"></pre>
+      </section>
+
+      <section id="tab-quick" class="tab-panel">
+        <h1 class="header">Gestione Turni Rapidi</h1>
+        <p class="hint">Crea, modifica o elimina preset veloci e applicali al giorno in compilazione.</p>
+
+        <section class="box">
+          <h2>Dettaglio Turno Rapido</h2>
+          <div class="row form-grid">
+            <label for="quick-name">Nome</label>
+            <input id="quick-name" type="text" placeholder="Nome turno rapido">
+            <label for="quick-start">Inizio</label>
+            <input id="quick-start" type="time" value="06:00">
+            <label for="quick-end">Fine</label>
+            <input id="quick-end" type="time" value="14:00">
+          </div>
+          <div class="row">
+            <button id="save-quick">Salva / Aggiorna</button>
+            <button id="new-quick" class="secondary">Nuovo</button>
+            <button id="delete-quick" class="danger">Elimina</button>
+            <button id="apply-quick-to-day">Applica al Giorno</button>
+          </div>
+        </section>
+
+        <section class="box table-wrap">
+          <table id="quick-table">
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Inizio</th>
+                <th>Fine</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </section>
+      </section>
+
+      <section id="tab-report" class="tab-panel">
+        <h1 class="header">Report Mensile, Export e Utility</h1>
+        <div class="row">
+          <button id="export-pdf">Esporta PDF del Mese</button>
+          <button id="export-backup">Esporta Backup JSON</button>
+          <button id="recalculate-all">Ricalcola Tutto lo Storico</button>
+        </div>
+        <section class="box">
+          <textarea id="report-text" readonly></textarea>
+        </section>
+      </section>
+
+      <section id="tab-settings" class="tab-panel">
+        <h1 class="header">Impostazioni Paghe</h1>
+        <section id="settings-box" class="box"></section>
+        <button id="save-settings">Salva Impostazioni</button>
+      </section>
+
+      <section id="tab-admin" class="tab-panel">
+        <h1 class="header">Gestione Utenti</h1>
+        <section class="box table-wrap">
+          <table id="admin-users-table">
+            <thead>
+              <tr>
+                <th>Utente</th>
+                <th>Ruolo</th>
+                <th>Stato</th>
+                <th>Turni</th>
+                <th>Ultimo Login</th>
+                <th>Azioni</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  {% if google_client_id %}
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  {% endif %}
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

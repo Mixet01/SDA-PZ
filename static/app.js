@@ -236,14 +236,14 @@
       const tr = document.createElement("tr");
       if (row.type === "week") {
         tr.className = "week-row";
-        tr.innerHTML = `<td colspan="7">${escapeHtml(row.label)}</td>`;
+        tr.innerHTML = `<td colspan="5">${escapeHtml(row.label)}</td>`;
       } else {
         tr.classList.add("selectable");
         if (state.currentEditDate === row.date) {
           tr.classList.add("selected");
           selectedStillExists = true;
         }
-        tr.innerHTML = `<td>${escapeHtml(row.display_date)}</td><td>${escapeHtml(row.start_display)}</td><td>${escapeHtml(row.end_display)}</td><td>${escapeHtml(row.hours_display)}</td><td>${escapeHtml(row.desc_display)}</td><td>${escapeHtml(row.total_display)}</td><td>${escapeHtml(row.detail_display)}</td>`;
+        tr.innerHTML = `<td>${escapeHtml(row.display_date)}</td><td>${escapeHtml(row.start_display)}</td><td>${escapeHtml(row.end_display)}</td><td>${escapeHtml(row.total_display)}</td><td>${escapeHtml(row.detail_display)}</td>`;
         tr.addEventListener("click", () => {
           selectEntry(row.entry, row.date);
           renderMonthTable();
