@@ -233,7 +233,10 @@ class SDAEngine:
 
         total = 0.0
         for voce, minutes in details.items():
-            total += (self.settings.get(voce, 0) / 60) * minutes
+            if voce == "FESTIVO_GODUTO":
+                total += float(self.settings.get("FESTIVO_GODUTO", 0) or 0)
+            else:
+                total += (self.settings.get(voce, 0) / 60) * minutes
         return desc, round(total, 2), {k: round(v / 60, 2) for k, v in details.items()}, details
 
     def build_entry(self, payload):
@@ -539,6 +542,7 @@ def get_pwa_icon_descriptor():
             return {
                 "href": f"/static/{safe_name}",
                 "src": f"/static/{safe_name}",
+                "full_path": full_path,
                 "type": mime,
                 "sizes": sizes,
                 "purpose": "any maskable",
@@ -549,12 +553,20 @@ def get_pwa_icon_descriptor():
     return {
         "href": "/pwa-icon.svg",
         "src": "/pwa-icon.svg",
+        "full_path": "",
         "type": "image/svg+xml",
         "sizes": "any",
         "purpose": "any maskable",
         "is_custom": False,
         "filename": "pwa-icon.svg",
     }
+
+
+def pwa_icon_cache_tag(icon):
+    full_path = icon.get("full_path") or ""
+    if full_path and os.path.exists(full_path):
+        return str(int(os.path.getmtime(full_path)))
+    return "generated"
 
 
 def db_connect():
@@ -912,6 +924,7 @@ def resolve_view_user(current_user):
 @app.get("/manifest.webmanifest")
 def manifest_webmanifest():
     icon = get_pwa_icon_descriptor()
+    icon_src = f"/app-icon?v={pwa_icon_cache_tag(icon)}" if icon.get("is_custom") else "/pwa-icon.svg"
     manifest = {
         "name": PWA_APP_NAME,
         "short_name": PWA_SHORT_NAME,
@@ -924,7 +937,7 @@ def manifest_webmanifest():
         "theme_color": pwa_color(PWA_THEME_COLOR, "#0e2346"),
         "icons": [
             {
-                "src": icon["src"],
+                "src": icon_src,
                 "sizes": icon["sizes"],
                 "type": icon["type"],
                 "purpose": icon["purpose"],
@@ -932,6 +945,22 @@ def manifest_webmanifest():
         ],
     }
     return Response(json.dumps(manifest, ensure_ascii=False), mimetype="application/manifest+json")
+
+
+@app.get("/app-icon")
+def app_icon():
+    icon = get_pwa_icon_descriptor()
+    if icon.get("is_custom") and icon.get("full_path"):
+        return send_file(icon["full_path"], mimetype=icon["type"], max_age=300)
+    return pwa_icon_svg()
+
+
+@app.get("/apple-touch-icon.png")
+def apple_touch_icon():
+    icon = get_pwa_icon_descriptor()
+    if icon.get("is_custom") and icon.get("full_path"):
+        return send_file(icon["full_path"], mimetype=icon["type"], max_age=300)
+    return pwa_icon_svg()
 
 
 @app.get("/service-worker.js")
@@ -1005,6 +1034,9 @@ def pwa_icon_svg():
 def index():
     today = date.today()
     icon = get_pwa_icon_descriptor()
+    icon_tag = pwa_icon_cache_tag(icon)
+    icon_href = f"/app-icon?v={icon_tag}" if icon.get("is_custom") else "/pwa-icon.svg"
+    apple_icon_href = f"/apple-touch-icon.png?v={icon_tag}" if icon.get("is_custom") else "/pwa-icon.svg"
     return render_template(
         "index.html",
         today_date=today.strftime("%Y-%m-%d"),
@@ -1013,7 +1045,8 @@ def index():
         pwa_app_name=PWA_APP_NAME,
         pwa_short_name=PWA_SHORT_NAME,
         pwa_theme_color=pwa_color(PWA_THEME_COLOR, "#0e2346"),
-        pwa_icon_href=icon["href"],
+        pwa_icon_href=icon_href,
+        pwa_apple_icon_href=apple_icon_href,
     )
 
 
