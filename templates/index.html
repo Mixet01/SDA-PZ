@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-title" content="{{ pwa_short_name }}">
   <link rel="manifest" href="{{ url_for('manifest_webmanifest') }}">
   <link rel="icon" href="{{ pwa_icon_href }}">
-  <link rel="apple-touch-icon" href="{{ pwa_icon_href }}">
+  <link rel="apple-touch-icon" sizes="180x180" href="{{ pwa_apple_icon_href }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body
@@ -189,10 +189,10 @@
         <button id="apply-main-quick" class="btn secondary">Applica</button>
       </div>
       <div class="flags-col">
-        <label><input id="flag-festivo" type="checkbox"> Festivo lavorato (+goduto)</label>
-        <label><input id="flag-festivo-goduto" type="checkbox"> Festivo goduto</label>
-        <label><input id="flag-ferie" type="checkbox"> Ferie</label>
-        <label><input id="flag-malattia" type="checkbox"> Malattia</label>
+        <label class="flag-card"><input id="flag-festivo" type="checkbox"><span>Festivo lavorato (+goduto)</span></label>
+        <label class="flag-card"><input id="flag-festivo-goduto" type="checkbox"><span>Festivo goduto</span></label>
+        <label class="flag-card"><input id="flag-ferie" type="checkbox"><span>Ferie</span></label>
+        <label class="flag-card"><input id="flag-malattia" type="checkbox"><span>Malattia</span></label>
       </div>
       <p id="edit-label" class="sub">Compila i campi e salva.</p>
       <div class="field-row">
