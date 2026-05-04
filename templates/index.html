@@ -25,6 +25,7 @@
       {% if google_client_id %}
       <p class="sub">Accedi con Google</p>
       <div id="google-signin"></div>
+      <button id="google-switch-auth" class="btn secondary wide hidden">Usa un altro account</button>
       {% else %}
       <p class="sub">Google non configurato. Accesso di test:</p>
       <div class="field-row">
@@ -158,6 +159,7 @@
           <button id="export-pdf" class="btn secondary">Export PDF</button>
           <button id="export-backup" class="btn secondary">Backup</button>
         </div>
+        <button id="switch-account-btn" class="btn secondary wide">Cambia account</button>
         <button id="logout-btn-profile" class="btn danger wide">Esci</button>
       </section>
     </main>
