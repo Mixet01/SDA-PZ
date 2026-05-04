@@ -9,8 +9,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="{{ pwa_short_name }}">
   <link rel="manifest" href="{{ url_for('manifest_webmanifest') }}">
-  <link rel="icon" href="{{ url_for('pwa_icon_svg') }}">
-  <link rel="apple-touch-icon" href="{{ url_for('pwa_icon_svg') }}">
+  <link rel="icon" href="{{ pwa_icon_href }}">
+  <link rel="apple-touch-icon" href="{{ pwa_icon_href }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body
