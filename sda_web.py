@@ -966,7 +966,7 @@ def apple_touch_icon():
 @app.get("/service-worker.js")
 def service_worker():
     script = """
-const CACHE_NAME = "sda-pwa-v4";
+const CACHE_NAME = "sda-pwa-v5";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
@@ -974,6 +974,15 @@ const APP_SHELL = [
   "/static/styles.css",
   "/static/app.js"
 ];
+
+function isDynamicRequest(url) {
+  return (
+    url.pathname.startsWith("/api/") ||
+    url.pathname.startsWith("/auth/") ||
+    url.pathname === "/app-icon" ||
+    url.pathname === "/apple-touch-icon.png"
+  );
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
@@ -991,6 +1000,13 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  const url = new URL(event.request.url);
+
+  if (isDynamicRequest(url)) {
+    event.respondWith(fetch(event.request, { cache: "no-store" }));
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
