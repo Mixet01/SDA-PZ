@@ -17,6 +17,7 @@
     pendingGate: document.getElementById("pending-gate"),
     appMain: document.getElementById("app-main"),
     googleSignin: document.getElementById("google-signin"),
+    googleSwitchAuth: document.getElementById("google-switch-auth"),
     devName: document.getElementById("dev-name"),
     devEmail: document.getElementById("dev-email"),
     devLogin: document.getElementById("dev-login"),
@@ -78,6 +79,7 @@
     profileBreakdown: document.getElementById("profile-breakdown"),
     exportPdf: document.getElementById("export-pdf"),
     exportBackup: document.getElementById("export-backup"),
+    switchAccountBtn: document.getElementById("switch-account-btn"),
     logoutProfile: document.getElementById("logout-btn-profile"),
 
     navButtons: Array.from(document.querySelectorAll(".nav-btn")),
@@ -127,6 +129,9 @@
     els.authGate.classList.toggle("hidden", mode !== "auth");
     els.pendingGate.classList.toggle("hidden", mode !== "pending");
     els.appMain.classList.toggle("hidden", mode !== "app");
+    if (els.googleSwitchAuth) {
+      els.googleSwitchAuth.classList.toggle("hidden", mode !== "auth" || !googleClientId);
+    }
   }
 
   function userIsAdmin() {
@@ -330,6 +335,17 @@
       const detail = row.detail_display || row.desc_display || "-";
       const start = row.start_display || "-";
       const end = row.end_display || "-";
+      const canDelete = state.canEdit && row.entry && !(
+        !row.entry.desc &&
+        !row.entry.start &&
+        !row.entry.end &&
+        Number(row.entry.total || 0) === 0 &&
+        (!row.entry.detail || Object.keys(row.entry.detail).length === 0) &&
+        (!row.entry.detail_minutes || Object.keys(row.entry.detail_minutes).length === 0)
+      );
+      const deleteMarkup = canDelete
+        ? `<div class="shift-actions"><button class="trash-btn" title="Elimina turno" data-delete-date="${escapeHtml(date)}">&#128465;</button></div>`
+        : "";
 
       const card = document.createElement("article");
       card.className = "shift-card";
@@ -340,9 +356,7 @@
         </div>
         <div>
           <div class="shift-desc">${escapeHtml(detail)}</div>
-          <div class="shift-actions">
-            <button class="trash-btn" title="Elimina turno" data-delete-date="${escapeHtml(date)}">&#128465;</button>
-          </div>
+          ${deleteMarkup}
         </div>
         <div class="shift-total">${escapeHtml(totalText)}</div>
       `;
@@ -563,10 +577,34 @@
   }
 
   async function logout() {
+    if (window.google && window.google.accounts && window.google.accounts.id) {
+      window.google.accounts.id.disableAutoSelect();
+    }
     await api("/auth/logout", { method: "POST" });
     state.me = null;
     state.viewedUser = null;
     showGate("auth");
+  }
+
+  async function switchAccount() {
+    if (window.google && window.google.accounts && window.google.accounts.id) {
+      window.google.accounts.id.disableAutoSelect();
+    }
+    await api("/auth/logout", { method: "POST" });
+    state.me = null;
+    state.viewedUser = null;
+    showGate("auth");
+    if (els.googleSignin) {
+      els.googleSignin.innerHTML = "";
+    }
+    initGoogleSignIn();
+    setTimeout(() => {
+      if (window.google && window.google.accounts && window.google.accounts.id) {
+        try {
+          window.google.accounts.id.prompt();
+        } catch (_e) {}
+      }
+    }, 250);
   }
 
   async function addShift() {
@@ -681,6 +719,11 @@
         shape: "pill",
         text: "continue_with",
       });
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("switch_account") === "1") {
+        window.google.accounts.id.disableAutoSelect();
+        window.google.accounts.id.prompt();
+      }
     };
     waitGoogle();
   }
@@ -772,7 +815,16 @@
         alert(err.message);
       }
     };
+    const doSwitchAccount = async () => {
+      try {
+        await switchAccount();
+      } catch (err) {
+        alert(err.message);
+      }
+    };
     els.logoutProfile.addEventListener("click", doLogout);
+    if (els.switchAccountBtn) els.switchAccountBtn.addEventListener("click", doSwitchAccount);
+    if (els.googleSwitchAuth) els.googleSwitchAuth.addEventListener("click", doSwitchAccount);
     if (els.pendingLogout) els.pendingLogout.addEventListener("click", doLogout);
 
     if (els.devLogin) {
