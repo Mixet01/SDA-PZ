@@ -85,6 +85,7 @@
   };
 
   const googleClientId = (els.body.dataset.googleClientId || "").trim();
+  const pwaAppName = (els.body.dataset.pwaAppName || "I Miei Turni").trim();
   const monthFormatter = new Intl.DateTimeFormat("it-IT", { month: "long", year: "numeric" });
 
   function formatEur(num) {
@@ -777,7 +778,15 @@
     });
   }
 
+  function registerServiceWorker() {
+    if (!("serviceWorker" in navigator)) return;
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("/service-worker.js").catch(() => {});
+    });
+  }
+
   async function boot() {
+    document.title = pwaAppName;
     const today = els.body.dataset.today || "";
     els.shiftDate.value = today;
     const monthVal = els.body.dataset.month || "";
@@ -787,6 +796,7 @@
 
     bindEvents();
     initGoogleSignIn();
+    registerServiceWorker();
 
     try {
       await refreshMe();
