@@ -3,10 +3,22 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>I Miei Turni - SDA</title>
+  <title>{{ pwa_app_name }}</title>
+  <meta name="theme-color" content="{{ pwa_theme_color }}">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="{{ pwa_short_name }}">
+  <link rel="manifest" href="{{ url_for('manifest_webmanifest') }}">
+  <link rel="icon" href="{{ url_for('pwa_icon_svg') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('pwa_icon_svg') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
-<body data-today="{{ today_date }}" data-month="{{ current_month }}" data-google-client-id="{{ google_client_id }}">
+<body
+  data-today="{{ today_date }}"
+  data-month="{{ current_month }}"
+  data-google-client-id="{{ google_client_id }}"
+  data-pwa-app-name="{{ pwa_app_name }}"
+>
   <section id="auth-gate" class="gate">
     <h1 class="title-big">Accesso Gestione Turni</h1>
     <div class="panel">
