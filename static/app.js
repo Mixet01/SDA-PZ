@@ -109,7 +109,11 @@
   }
 
   async function api(url, options = {}) {
-    const response = await fetch(url, options);
+    const fetchOptions = { ...options };
+    if (!fetchOptions.method || fetchOptions.method.toUpperCase() === "GET") {
+      fetchOptions.cache = "no-store";
+    }
+    const response = await fetch(url, fetchOptions);
     let data = null;
     try {
       data = await response.json();
@@ -872,6 +876,43 @@
     });
   }
 
+  function registerSmartRefresh() {
+    let refreshTimer = null;
+    let isRefreshing = false;
+
+    const safeRefresh = async () => {
+      if (isRefreshing || !state.me || document.hidden) return;
+      isRefreshing = true;
+      try {
+        await refreshMe();
+        if (state.me && state.me.approved) {
+          await refreshState();
+        }
+      } catch (_err) {
+      } finally {
+        isRefreshing = false;
+      }
+    };
+
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) {
+        safeRefresh();
+      }
+    });
+
+    window.addEventListener("focus", safeRefresh);
+
+    refreshTimer = window.setInterval(() => {
+      safeRefresh();
+    }, 15000);
+
+    return () => {
+      if (refreshTimer) {
+        window.clearInterval(refreshTimer);
+      }
+    };
+  }
+
   async function boot() {
     document.title = pwaAppName;
     const today = els.body.dataset.today || "";
@@ -885,6 +926,7 @@
     bindEvents();
     initGoogleSignIn();
     registerServiceWorker();
+    registerSmartRefresh();
 
     try {
       await refreshMe();
