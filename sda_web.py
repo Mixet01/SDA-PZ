@@ -1,6 +1,7 @@
 import calendar
 import copy
 import json
+import mimetypes
 import os
 import re
 import shutil
@@ -484,6 +485,7 @@ PWA_APP_NAME = os.environ.get("PWA_APP_NAME", "I Miei Turni").strip() or "I Miei
 PWA_SHORT_NAME = os.environ.get("PWA_SHORT_NAME", PWA_APP_NAME[:12]).strip() or PWA_APP_NAME[:12]
 PWA_THEME_COLOR = os.environ.get("PWA_THEME_COLOR", "#0e2346").strip() or "#0e2346"
 PWA_BG_COLOR = os.environ.get("PWA_BG_COLOR", "#f4f7fc").strip() or "#f4f7fc"
+PWA_ICON_FILE = os.environ.get("PWA_ICON_FILE", "").strip()
 PWA_ICON_TEXT = os.environ.get("PWA_ICON_TEXT", "MT").strip() or "MT"
 PWA_ICON_START = os.environ.get("PWA_ICON_START", "#1d6dff").strip() or "#1d6dff"
 PWA_ICON_END = os.environ.get("PWA_ICON_END", "#00d1c7").strip() or "#00d1c7"
@@ -508,6 +510,51 @@ def pwa_color(value, fallback):
 def pwa_label(value):
     cleaned = re.sub(r"[^A-Za-z0-9 ]", "", str(value or "").strip().upper())
     return (cleaned[:3] or "MT").strip()
+
+
+def get_pwa_icon_descriptor():
+    candidates = []
+    if PWA_ICON_FILE:
+        candidates.append(PWA_ICON_FILE)
+    candidates.extend(
+        [
+            "pwa-icon.png",
+            "pwa-icon-512.png",
+            "pwa-icon.jpg",
+            "pwa-icon.jpeg",
+            "pwa-icon.svg",
+            "icon.png",
+            "icon.jpg",
+            "icon.jpeg",
+            "icon.svg",
+        ]
+    )
+
+    for candidate in candidates:
+        safe_name = os.path.basename(candidate)
+        full_path = os.path.join(app.static_folder, safe_name)
+        if os.path.exists(full_path):
+            mime = mimetypes.guess_type(full_path)[0] or "image/png"
+            sizes = "any" if safe_name.lower().endswith(".svg") else "512x512"
+            return {
+                "href": f"/static/{safe_name}",
+                "src": f"/static/{safe_name}",
+                "type": mime,
+                "sizes": sizes,
+                "purpose": "any maskable",
+                "is_custom": True,
+                "filename": safe_name,
+            }
+
+    return {
+        "href": "/pwa-icon.svg",
+        "src": "/pwa-icon.svg",
+        "type": "image/svg+xml",
+        "sizes": "any",
+        "purpose": "any maskable",
+        "is_custom": False,
+        "filename": "pwa-icon.svg",
+    }
 
 
 def db_connect():
@@ -864,6 +911,7 @@ def resolve_view_user(current_user):
 
 @app.get("/manifest.webmanifest")
 def manifest_webmanifest():
+    icon = get_pwa_icon_descriptor()
     manifest = {
         "name": PWA_APP_NAME,
         "short_name": PWA_SHORT_NAME,
@@ -876,10 +924,10 @@ def manifest_webmanifest():
         "theme_color": pwa_color(PWA_THEME_COLOR, "#0e2346"),
         "icons": [
             {
-                "src": "/pwa-icon.svg",
-                "sizes": "any",
-                "type": "image/svg+xml",
-                "purpose": "any maskable",
+                "src": icon["src"],
+                "sizes": icon["sizes"],
+                "type": icon["type"],
+                "purpose": icon["purpose"],
             }
         ],
     }
@@ -956,6 +1004,7 @@ def pwa_icon_svg():
 @app.get("/")
 def index():
     today = date.today()
+    icon = get_pwa_icon_descriptor()
     return render_template(
         "index.html",
         today_date=today.strftime("%Y-%m-%d"),
@@ -964,6 +1013,7 @@ def index():
         pwa_app_name=PWA_APP_NAME,
         pwa_short_name=PWA_SHORT_NAME,
         pwa_theme_color=pwa_color(PWA_THEME_COLOR, "#0e2346"),
+        pwa_icon_href=icon["href"],
     )
 
 

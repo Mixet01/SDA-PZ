@@ -14,7 +14,7 @@ Versione web dell'applicazione `sda.py`, mantenendo struttura e logica il piu po
    $env:SDA_WEB_SECRET="una-chiave-lunga-casuale"
    $env:PWA_APP_NAME="I Miei Turni"
    $env:PWA_SHORT_NAME="Turni"
-   $env:PWA_ICON_TEXT="MT"
+   $env:PWA_ICON_FILE="pwa-icon.png"
    ```
 3. Avvia server:
    ```powershell
@@ -61,11 +61,34 @@ Puoi personalizzare nome, tema e icona installabile con queste variabili:
 - `PWA_SHORT_NAME=Turni`
 - `PWA_THEME_COLOR=#0e2346`
 - `PWA_BG_COLOR=#f4f7fc`
+- `PWA_ICON_FILE=pwa-icon.png`
 - `PWA_ICON_TEXT=MT`
 - `PWA_ICON_START=#1d6dff`
 - `PWA_ICON_END=#00d1c7`
 
-Esempio: `PWA_ICON_TEXT=SDA` crea un'icona con le lettere scelte da te.
+### Icona immagine vera
+
+Se vuoi un'icona vera invece del testo:
+
+1. metti il file dentro `static/`
+2. chiamalo per esempio `pwa-icon.png`
+3. imposta:
+   - `PWA_ICON_FILE=pwa-icon.png`
+
+Formati supportati:
+- `.png`
+- `.jpg`
+- `.jpeg`
+- `.svg`
+
+Se `PWA_ICON_FILE` non e impostato, l'app prova comunque a trovare automaticamente:
+- `static/pwa-icon.png`
+- `static/pwa-icon-512.png`
+- `static/pwa-icon.jpg`
+- `static/pwa-icon.jpeg`
+- `static/pwa-icon.svg`
+
+Se non trova nessun file, usa il fallback con testo generato.
 
 ### 4) Primo avvio
 
