@@ -202,6 +202,37 @@
     els.flagMalattia.checked = false;
     els.quickMain.value = "";
     els.editLabel.textContent = "Compila i campi e salva.";
+    syncShiftFlags();
+  }
+
+  function syncShiftFlags() {
+    if (els.flagFestivo.checked) {
+      els.flagFestivoGoduto.checked = true;
+      els.flagFestivoGoduto.disabled = true;
+      els.flagFerie.checked = false;
+      els.flagMalattia.checked = false;
+    } else {
+      els.flagFestivoGoduto.disabled = false;
+    }
+
+    if (els.flagFestivoGoduto.checked && !els.flagFestivo.checked) {
+      els.flagFerie.checked = false;
+      els.flagMalattia.checked = false;
+    }
+
+    if (els.flagFerie.checked) {
+      els.flagFestivo.checked = false;
+      els.flagFestivoGoduto.checked = false;
+      els.flagFestivoGoduto.disabled = false;
+      els.flagMalattia.checked = false;
+    }
+
+    if (els.flagMalattia.checked) {
+      els.flagFestivo.checked = false;
+      els.flagFestivoGoduto.checked = false;
+      els.flagFestivoGoduto.disabled = false;
+      els.flagFerie.checked = false;
+    }
   }
 
   function clearQuickForm() {
@@ -730,6 +761,10 @@
       await refreshState();
     });
 
+    [els.flagFestivo, els.flagFestivoGoduto, els.flagFerie, els.flagMalattia].forEach((checkbox) => {
+      checkbox.addEventListener("change", syncShiftFlags);
+    });
+
     const doLogout = async () => {
       try {
         await logout();
@@ -789,6 +824,7 @@
     document.title = pwaAppName;
     const today = els.body.dataset.today || "";
     els.shiftDate.value = today;
+    syncShiftFlags();
     const monthVal = els.body.dataset.month || "";
     els.monthInput.value = monthVal;
     const { year, month } = getMonthYear();
