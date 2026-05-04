@@ -480,6 +480,13 @@ app.secret_key = os.environ.get("SDA_WEB_SECRET", "change-me-in-production")
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
 
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+PWA_APP_NAME = os.environ.get("PWA_APP_NAME", "I Miei Turni").strip() or "I Miei Turni"
+PWA_SHORT_NAME = os.environ.get("PWA_SHORT_NAME", PWA_APP_NAME[:12]).strip() or PWA_APP_NAME[:12]
+PWA_THEME_COLOR = os.environ.get("PWA_THEME_COLOR", "#0e2346").strip() or "#0e2346"
+PWA_BG_COLOR = os.environ.get("PWA_BG_COLOR", "#f4f7fc").strip() or "#f4f7fc"
+PWA_ICON_TEXT = os.environ.get("PWA_ICON_TEXT", "MT").strip() or "MT"
+PWA_ICON_START = os.environ.get("PWA_ICON_START", "#1d6dff").strip() or "#1d6dff"
+PWA_ICON_END = os.environ.get("PWA_ICON_END", "#00d1c7").strip() or "#00d1c7"
 lock = Lock()
 
 os.makedirs(USER_DATA_DIR, exist_ok=True)
@@ -491,6 +498,16 @@ def default_user_payload():
         "quick_shifts": copy.deepcopy(DEFAULT_QUICK_SHIFTS),
         "data": [],
     }
+
+
+def pwa_color(value, fallback):
+    value = str(value or "").strip()
+    return value if re.fullmatch(r"#[0-9a-fA-F]{6}", value) else fallback
+
+
+def pwa_label(value):
+    cleaned = re.sub(r"[^A-Za-z0-9 ]", "", str(value or "").strip().upper())
+    return (cleaned[:3] or "MT").strip()
 
 
 def db_connect():
@@ -845,6 +862,97 @@ def resolve_view_user(current_user):
     return target, can_edit
 
 
+@app.get("/manifest.webmanifest")
+def manifest_webmanifest():
+    manifest = {
+        "name": PWA_APP_NAME,
+        "short_name": PWA_SHORT_NAME,
+        "description": "Gestione turni, paghe e riepiloghi mensili.",
+        "start_url": "/",
+        "scope": "/",
+        "display": "standalone",
+        "orientation": "portrait",
+        "background_color": pwa_color(PWA_BG_COLOR, "#f4f7fc"),
+        "theme_color": pwa_color(PWA_THEME_COLOR, "#0e2346"),
+        "icons": [
+            {
+                "src": "/pwa-icon.svg",
+                "sizes": "any",
+                "type": "image/svg+xml",
+                "purpose": "any maskable",
+            }
+        ],
+    }
+    return Response(json.dumps(manifest, ensure_ascii=False), mimetype="application/manifest+json")
+
+
+@app.get("/service-worker.js")
+def service_worker():
+    script = """
+const CACHE_NAME = "sda-pwa-v3";
+const APP_SHELL = [
+  "/",
+  "/manifest.webmanifest",
+  "/pwa-icon.svg",
+  "/static/styles.css",
+  "/static/app.js"
+];
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
+    )
+  );
+  self.clients.claim();
+});
+
+self.addEventListener("fetch", (event) => {
+  if (event.request.method !== "GET") return;
+  event.respondWith(
+    caches.match(event.request).then((cached) => {
+      if (cached) return cached;
+      return fetch(event.request)
+        .then((response) => {
+          if (!response || response.status !== 200 || response.type !== "basic") return response;
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          return response;
+        })
+        .catch(() => caches.match("/"));
+    })
+  );
+});
+""".strip()
+    return Response(script, mimetype="application/javascript")
+
+
+@app.get("/pwa-icon.svg")
+def pwa_icon_svg():
+    label = escape(pwa_label(PWA_ICON_TEXT))
+    start = escape(pwa_color(PWA_ICON_START, "#1d6dff"))
+    end = escape(pwa_color(PWA_ICON_END, "#00d1c7"))
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<defs>
+  <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="{start}"/>
+    <stop offset="100%" stop-color="{end}"/>
+  </linearGradient>
+</defs>
+<rect width="512" height="512" rx="132" fill="#0e2346"/>
+<circle cx="392" cy="124" r="74" fill="url(#g)" opacity="0.92"/>
+<rect x="60" y="86" width="392" height="340" rx="88" fill="url(#g)"/>
+<rect x="86" y="114" width="340" height="284" rx="62" fill="#ffffff" opacity="0.14"/>
+<text x="256" y="300" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="162" font-weight="800" fill="white">{label}</text>
+</svg>"""
+    return Response(svg, mimetype="image/svg+xml")
+
+
 @app.get("/")
 def index():
     today = date.today()
@@ -853,6 +961,9 @@ def index():
         today_date=today.strftime("%Y-%m-%d"),
         current_month=today.strftime("%Y-%m"),
         google_client_id=GOOGLE_CLIENT_ID,
+        pwa_app_name=PWA_APP_NAME,
+        pwa_short_name=PWA_SHORT_NAME,
+        pwa_theme_color=pwa_color(PWA_THEME_COLOR, "#0e2346"),
     )
 
 

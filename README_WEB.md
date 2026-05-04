@@ -12,6 +12,9 @@ Versione web dell'applicazione `sda.py`, mantenendo struttura e logica il piu po
    ```powershell
    $env:GOOGLE_CLIENT_ID="IL_TUO_CLIENT_ID_GOOGLE"
    $env:SDA_WEB_SECRET="una-chiave-lunga-casuale"
+   $env:PWA_APP_NAME="I Miei Turni"
+   $env:PWA_SHORT_NAME="Turni"
+   $env:PWA_ICON_TEXT="MT"
    ```
 3. Avvia server:
    ```powershell
@@ -49,6 +52,20 @@ Se vuoi restare su Render free senza perdere dati, usa Supabase come storage per
 - Opzionale: `PYTHON_VERSION=3.11.11`
 
 Con `DATABASE_URL` impostata, l'app salva utenti e turni in Postgres (Supabase) invece che in file locali.
+
+### 3.b) Branding PWA personalizzabile
+
+Puoi personalizzare nome, tema e icona installabile con queste variabili:
+
+- `PWA_APP_NAME=I Miei Turni`
+- `PWA_SHORT_NAME=Turni`
+- `PWA_THEME_COLOR=#0e2346`
+- `PWA_BG_COLOR=#f4f7fc`
+- `PWA_ICON_TEXT=MT`
+- `PWA_ICON_START=#1d6dff`
+- `PWA_ICON_END=#00d1c7`
+
+Esempio: `PWA_ICON_TEXT=SDA` crea un'icona con le lettere scelte da te.
 
 ### 4) Primo avvio
 
@@ -97,3 +114,13 @@ L'admin puo vedere altri utenti, ma in sola lettura.
 ## Note export PDF
 
 Il pulsante "Esporta PDF del Mese" apre una vista pronta per la stampa: dal browser puoi salvarla in PDF su Windows, iPhone e Android.
+
+## PWA
+
+L'app ora include:
+
+- `manifest.webmanifest`
+- `service-worker.js`
+- icona SVG dinamica
+- supporto installazione su Android/desktop
+- supporto "Aggiungi alla schermata Home" su iPhone
