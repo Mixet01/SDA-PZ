@@ -385,6 +385,7 @@ select:focus {
   box-shadow: var(--shadow-soft);
   position: relative;
   overflow: hidden;
+  cursor: pointer;
 }
 
 .shift-card::before {

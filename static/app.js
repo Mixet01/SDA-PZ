@@ -3,12 +3,14 @@
     me: null,
     canEdit: true,
     viewedUser: null,
-    currentQuickIndex: null,
     quickShifts: [],
     settings: {},
     view: null,
     adminUsers: [],
     adminFilter: "all",
+    activeScreen: "screen-turni",
+    settingsDirty: false,
+    editingEntryDate: null,
   };
 
   const els = {
@@ -51,6 +53,7 @@
     flagMalattia: document.getElementById("flag-malattia"),
     addShift: document.getElementById("add-shift"),
     editLabel: document.getElementById("edit-label"),
+    shiftModalTitle: document.getElementById("shift-modal-title"),
 
     settingsSections: document.getElementById("settings-sections"),
     saveSettings: document.getElementById("save-settings"),
@@ -89,6 +92,8 @@
   const googleClientId = (els.body.dataset.googleClientId || "").trim();
   const pwaAppName = (els.body.dataset.pwaAppName || "I Miei Turni").trim();
   const monthFormatter = new Intl.DateTimeFormat("it-IT", { month: "long", year: "numeric" });
+  const localDB = window.sdaLocalDB || null;
+  let syncInFlight = false;
 
   function formatEur(num) {
     return `€${Number(num || 0).toFixed(2)}`;
@@ -106,6 +111,39 @@
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#39;");
+  }
+
+  function meCacheKey() {
+    return "me";
+  }
+
+  function stateCacheKey(viewingEmail, year, month) {
+    return `state:${viewingEmail || "guest"}:${year}-${String(month).padStart(2, "0")}`;
+  }
+
+  async function localGet(key) {
+    if (!localDB) return null;
+    try {
+      return await localDB.get(key);
+    } catch (_err) {
+      return null;
+    }
+  }
+
+  async function localSet(key, value) {
+    if (!localDB) return;
+    try {
+      await localDB.set(key, value);
+    } catch (_err) {
+    }
+  }
+
+  async function enqueueMutation(item) {
+    if (!localDB) return;
+    try {
+      await localDB.addQueue(item);
+    } catch (_err) {
+    }
   }
 
   async function api(url, options = {}) {
@@ -187,7 +225,27 @@
     });
   }
 
+  function applyStatePayload(data) {
+    state.canEdit = Boolean(data.can_edit);
+    state.quickShifts = data.quick_shifts || [];
+    state.settings = data.settings || {};
+    state.view = data.view || { rows: [] };
+    state.viewedUser = data.viewing_email || (state.me && state.me.email) || null;
+  }
+
+  function renderStatePayload() {
+    renderReadonlyInfo();
+    setEditable(state.canEdit);
+    renderShiftList();
+    renderTurniSummaryCards();
+    if (!(state.activeScreen === "screen-paghe" && state.settingsDirty)) {
+      renderSettings();
+    }
+    renderProfile();
+  }
+
   function setActiveScreen(screenId) {
+    state.activeScreen = screenId;
     els.screens.forEach((s) => s.classList.toggle("active", s.id === screenId));
     els.navButtons.forEach((b) => b.classList.toggle("active", b.dataset.screen === screenId));
   }
@@ -202,6 +260,7 @@
   }
 
   function clearShiftForm() {
+    state.editingEntryDate = null;
     els.shiftDate.value = els.body.dataset.today || "";
     els.shiftStart.value = "06:00";
     els.shiftEnd.value = "14:00";
@@ -209,7 +268,8 @@
     els.flagFestivoGoduto.checked = false;
     els.flagFerie.checked = false;
     els.flagMalattia.checked = false;
-    els.quickMain.value = "";
+    if (els.shiftModalTitle) els.shiftModalTitle.textContent = "Nuovo Turno";
+    if (els.addShift) els.addShift.textContent = "Salva Turno";
     els.editLabel.textContent = "Compila i campi e salva.";
     syncShiftFlags();
   }
@@ -245,11 +305,7 @@
   }
 
   function clearQuickForm() {
-    state.currentQuickIndex = null;
-    els.quickName.value = "";
-    els.quickStart.value = "06:00";
-    els.quickEnd.value = "14:00";
-    renderQuickList();
+    return;
   }
 
   function getEntryRows() {
@@ -294,6 +350,7 @@
   }
 
   function renderQuickSelect() {
+    if (!els.quickMain) return;
     els.quickMain.innerHTML = "<option value=''>Turno rapido</option>";
     state.quickShifts.forEach((q, idx) => {
       const opt = document.createElement("option");
@@ -304,6 +361,7 @@
   }
 
   function renderQuickList() {
+    if (!els.quickList) return;
     els.quickList.innerHTML = "";
     if (!state.quickShifts.length) {
       els.quickList.innerHTML = "<div class='empty-state'>Nessun turno rapido.</div>";
@@ -353,6 +411,7 @@
 
       const card = document.createElement("article");
       card.className = "shift-card";
+      card.dataset.rowDate = date;
       card.innerHTML = `
         <div>
           <div class="shift-date">${escapeHtml(row.display_date || date)}</div>
@@ -366,6 +425,29 @@
       `;
       els.shiftList.appendChild(card);
     });
+  }
+
+  function findEntryRow(dateStr) {
+    return getEntryRows().find((row) => row.date === dateStr) || null;
+  }
+
+  function openEditShift(dateStr) {
+    const row = findEntryRow(dateStr);
+    if (!row || !row.entry || !state.canEdit) return;
+    const entry = row.entry;
+    state.editingEntryDate = dateStr;
+    if (els.shiftModalTitle) els.shiftModalTitle.textContent = "Modifica Turno";
+    if (els.addShift) els.addShift.textContent = "Salva Modifiche";
+    els.shiftDate.value = entry.date || dateStr;
+    els.shiftStart.value = entry.start || "06:00";
+    els.shiftEnd.value = entry.end || "14:00";
+    els.flagFestivo.checked = Boolean(entry.festivo);
+    els.flagFestivoGoduto.checked = Boolean(entry.festivo_goduto);
+    els.flagFerie.checked = Boolean(entry.ferie);
+    els.flagMalattia.checked = Boolean(entry.malattia);
+    els.editLabel.textContent = `Modifica il turno del ${dateStr} e salva.`;
+    syncShiftFlags();
+    openShiftModal();
   }
 
   function renderSettings() {
@@ -444,6 +526,7 @@
   }
 
   function applyQuickToShiftForm(index) {
+    if (!els.quickStart || !els.quickEnd) return;
     const q = state.quickShifts[index];
     if (!q) {
       alert("Seleziona prima un turno rapido.");
@@ -499,7 +582,7 @@
 
       const viewBtn = document.createElement("button");
       viewBtn.className = "btn primary";
-      viewBtn.textContent = "Visualizza";
+      viewBtn.textContent = "Apri";
       viewBtn.addEventListener("click", async () => {
         state.viewedUser = u.email;
         setActiveScreen("screen-turni");
@@ -524,6 +607,24 @@
           }
         });
         actions.appendChild(toggleBtn);
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "btn danger";
+        deleteBtn.textContent = "Elimina Utente";
+        deleteBtn.addEventListener("click", async () => {
+          if (!confirm(`Eliminare definitivamente l'utente ${u.email}?`)) return;
+          try {
+            await api(`/api/admin/users/${encodeURIComponent(u.email)}`, { method: "DELETE" });
+            if (state.viewedUser === u.email && state.me) {
+              state.viewedUser = state.me.email;
+            }
+            await refreshAdminUsers();
+            await refreshState({ silent: true });
+          } catch (err) {
+            alert(err.message);
+          }
+        });
+        actions.appendChild(deleteBtn);
       }
 
       els.adminUsersList.appendChild(card);
@@ -537,47 +638,84 @@
     renderAdminStatsAndList();
   }
 
-  async function refreshState() {
+  async function refreshState(options = {}) {
+    const { preferCache = false, silent = false } = options;
     const { year, month } = getMonthYear();
     const params = new URLSearchParams({ year: String(year), month: String(month) });
     if (userIsAdmin() && state.viewedUser && state.viewedUser !== state.me.email) {
       params.set("view_user", state.viewedUser);
     }
-    const data = await api(`/api/state?${params.toString()}`);
-    state.canEdit = Boolean(data.can_edit);
-    state.quickShifts = data.quick_shifts || [];
-    state.settings = data.settings || {};
-    state.view = data.view || { rows: [] };
-    state.viewedUser = data.viewing_email || state.me.email;
+    const expectedViewing = params.get("view_user") || (state.me && state.me.email) || state.viewedUser;
+    let hadCache = false;
 
-    renderReadonlyInfo();
-    setEditable(state.canEdit);
-    renderQuickSelect();
-    renderQuickList();
-    renderShiftList();
-    renderTurniSummaryCards();
-    renderSettings();
-    renderProfile();
-    if (userIsAdmin()) await refreshAdminUsers();
+    if (preferCache && expectedViewing) {
+      const cached = await localGet(stateCacheKey(expectedViewing, year, month));
+      if (cached) {
+        applyStatePayload(cached);
+        renderStatePayload();
+        hadCache = true;
+      }
+    }
+
+    try {
+      const data = await api(`/api/state?${params.toString()}`);
+      applyStatePayload(data);
+      renderStatePayload();
+      if (state.viewedUser) {
+        await localSet(stateCacheKey(state.viewedUser, year, month), data);
+      }
+      if (userIsAdmin()) await refreshAdminUsers();
+    } catch (err) {
+      if (!hadCache || !silent) {
+        throw err;
+      }
+    }
   }
 
-  async function refreshMe() {
-    const meData = await api("/api/me");
-    if (!meData.logged_in || !meData.user) {
-      state.me = null;
-      showGate("auth");
-      return;
+  async function refreshMe(options = {}) {
+    const { preferCache = false, silent = false } = options;
+    let hadCache = false;
+
+    if (preferCache) {
+      const cachedMe = await localGet(meCacheKey());
+      if (cachedMe && cachedMe.logged_in && cachedMe.user) {
+        state.me = cachedMe.user;
+        if (!state.me.approved) {
+          showGate("pending");
+        } else {
+          showGate("app");
+          els.helloUser.textContent = `Ciao, ${state.me.name || "utente"}`;
+          els.adminNavBtn.classList.toggle("hidden", !userIsAdmin());
+          els.bottomNav.classList.toggle("three", !userIsAdmin());
+          if (!state.viewedUser) state.viewedUser = state.me.email;
+        }
+        hadCache = true;
+      }
     }
-    state.me = meData.user;
-    if (!state.me.approved) {
-      showGate("pending");
-      return;
+
+    try {
+      const meData = await api("/api/me");
+      await localSet(meCacheKey(), meData);
+      if (!meData.logged_in || !meData.user) {
+        state.me = null;
+        showGate("auth");
+        return;
+      }
+      state.me = meData.user;
+      if (!state.me.approved) {
+        showGate("pending");
+        return;
+      }
+      showGate("app");
+      els.helloUser.textContent = `Ciao, ${state.me.name || "utente"}`;
+      els.adminNavBtn.classList.toggle("hidden", !userIsAdmin());
+      els.bottomNav.classList.toggle("three", !userIsAdmin());
+      if (!state.viewedUser) state.viewedUser = state.me.email;
+    } catch (err) {
+      if (!hadCache || !silent) {
+        throw err;
+      }
     }
-    showGate("app");
-    els.helloUser.textContent = `Ciao, ${state.me.name || "utente"}`;
-    els.adminNavBtn.classList.toggle("hidden", !userIsAdmin());
-    els.bottomNav.classList.toggle("three", !userIsAdmin());
-    if (!state.viewedUser) state.viewedUser = state.me.email;
   }
 
   async function logout() {
@@ -585,6 +723,7 @@
       window.google.accounts.id.disableAutoSelect();
     }
     await api("/auth/logout", { method: "POST" });
+    await localSet(meCacheKey(), { ok: true, logged_in: false, user: null });
     state.me = null;
     state.viewedUser = null;
     showGate("auth");
@@ -595,6 +734,7 @@
       window.google.accounts.id.disableAutoSelect();
     }
     await api("/auth/logout", { method: "POST" });
+    await localSet(meCacheKey(), { ok: true, logged_in: false, user: null });
     state.me = null;
     state.viewedUser = null;
     showGate("auth");
@@ -622,6 +762,12 @@
       ferie: els.flagFerie.checked,
       malattia: els.flagMalattia.checked,
     };
+    if (state.editingEntryDate) {
+      payload.original_date = state.editingEntryDate;
+    }
+    if (userIsAdmin() && state.viewedUser && state.me && state.viewedUser !== state.me.email) {
+      payload.view_user = state.viewedUser;
+    }
     await api("/api/entry", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -632,12 +778,68 @@
     await refreshState();
   }
 
+  async function applyLocalDelete(dateStr) {
+    if (!state.view || !Array.isArray(state.view.rows)) return;
+    const target = state.view.rows.find((row) => row.type === "entry" && row.date === dateStr);
+    if (!target) return;
+
+    target.start_display = "-";
+    target.end_display = "-";
+    target.hours_display = "-";
+    target.desc_display = "Non lavorato";
+    target.total_display = "-";
+    target.detail_display = "-";
+    target.entry = {
+      date: dateStr,
+      start: "",
+      end: "",
+      desc: "",
+      total: 0,
+      detail: {},
+      detail_minutes: {},
+      festivo: false,
+      festivo_goduto: false,
+      ferie: false,
+      malattia: false,
+    };
+
+    renderStatePayload();
+
+    const { year, month } = getMonthYear();
+    if (state.viewedUser) {
+      await localSet(
+        stateCacheKey(state.viewedUser, year, month),
+        {
+          can_edit: state.canEdit,
+          quick_shifts: state.quickShifts,
+          settings: state.settings,
+          view: state.view,
+          viewing_email: state.viewedUser,
+        }
+      );
+    }
+  }
+
   async function deleteShift(dateStr) {
     if (!state.canEdit) return;
     if (!dateStr) return;
     if (!confirm(`Eliminare il turno del ${dateStr}?`)) return;
-    await api(`/api/entry/${encodeURIComponent(dateStr)}`, { method: "DELETE" });
-    await refreshState();
+    await applyLocalDelete(dateStr);
+    let url = `/api/entry/${encodeURIComponent(dateStr)}`;
+    if (userIsAdmin() && state.viewedUser && state.me && state.viewedUser !== state.me.email) {
+      url += `?view_user=${encodeURIComponent(state.viewedUser)}`;
+    }
+    try {
+      await api(url, { method: "DELETE" });
+      await refreshState({ silent: true });
+    } catch (err) {
+      await enqueueMutation({
+        kind: "delete_shift",
+        url,
+        options: { method: "DELETE" },
+      });
+      alert("Turno rimosso in locale. La sincronizzazione col server verra ritentata.");
+    }
   }
 
   async function saveSettings() {
@@ -647,16 +849,50 @@
     inputs.forEach((input) => {
       next[input.dataset.settingKey] = Number(input.value);
     });
-    await api("/api/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ settings: next }),
-    });
-    await refreshState();
-    alert("Impostazioni salvate.");
+    const payload = { settings: next };
+    if (userIsAdmin() && state.viewedUser && state.me && state.viewedUser !== state.me.email) {
+      payload.view_user = state.viewedUser;
+    }
+    state.settings = { ...next };
+    state.settingsDirty = false;
+    renderSettings();
+    const { year, month } = getMonthYear();
+    if (state.viewedUser) {
+      await localSet(
+        stateCacheKey(state.viewedUser, year, month),
+        {
+          can_edit: state.canEdit,
+          quick_shifts: state.quickShifts,
+          settings: state.settings,
+          view: state.view,
+          viewing_email: state.viewedUser,
+        }
+      );
+    }
+    try {
+      await api("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      await refreshState({ silent: true });
+      alert("Impostazioni salvate.");
+    } catch (err) {
+      await enqueueMutation({
+        kind: "save_settings",
+        url: "/api/settings",
+        options: {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      });
+      alert("Paghe salvate in locale. La sincronizzazione col server verra ritentata.");
+    }
   }
 
   async function saveQuickShift(overwrite = false) {
+    if (!els.quickName || !els.quickStart || !els.quickEnd) return;
     if (!state.canEdit) return;
     const payload = {
       name: els.quickName.value.trim(),
@@ -681,6 +917,7 @@
   }
 
   async function deleteQuickShift() {
+    if (!els.quickList) return;
     if (!state.canEdit) return;
     if (!Number.isInteger(state.currentQuickIndex)) {
       alert("Seleziona un turno rapido.");
@@ -692,6 +929,29 @@
     await api(`/api/quick-shift/${state.currentQuickIndex}`, { method: "DELETE" });
     clearQuickForm();
     await refreshState();
+  }
+
+  async function syncQueuedMutations() {
+    if (!localDB || syncInFlight || !state.me) return;
+    syncInFlight = true;
+    try {
+      const pending = await localDB.listQueue("pending");
+      for (const item of pending) {
+        await localDB.updateQueue(item.id, { status: "syncing", attempts: Number(item.attempts || 0) + 1 });
+        try {
+          await api(item.url, item.options || {});
+          await localDB.deleteQueue(item.id);
+        } catch (_err) {
+          await localDB.updateQueue(item.id, { status: "pending" });
+        }
+      }
+      if (pending.length && state.me && state.me.approved) {
+        await refreshState({ silent: true });
+      }
+    } catch (_err) {
+    } finally {
+      syncInFlight = false;
+    }
   }
 
   function initGoogleSignIn() {
@@ -749,10 +1009,12 @@
       if (e.target === els.shiftModal) closeShiftModal();
     });
 
-    els.applyMainQuick.addEventListener("click", () => {
-      if (els.quickMain.value === "") return alert("Seleziona un turno rapido.");
-      applyQuickToShiftForm(Number(els.quickMain.value));
-    });
+    if (els.applyMainQuick && els.quickMain) {
+      els.applyMainQuick.addEventListener("click", () => {
+        if (els.quickMain.value === "") return alert("Seleziona un turno rapido.");
+        applyQuickToShiftForm(Number(els.quickMain.value));
+      });
+    }
     els.addShift.addEventListener("click", async () => {
       try {
         await addShift();
@@ -763,11 +1025,26 @@
 
     els.shiftList.addEventListener("click", async (e) => {
       const btn = e.target.closest("[data-delete-date]");
-      if (!btn) return;
-      try {
-        await deleteShift(btn.dataset.deleteDate);
-      } catch (err) {
-        alert(err.message);
+      if (btn) {
+        try {
+          await deleteShift(btn.dataset.deleteDate);
+        } catch (err) {
+          alert(err.message);
+        }
+        return;
+      }
+      const card = e.target.closest(".shift-card");
+      if (!card || !state.canEdit) return;
+      const row = findEntryRow(card.dataset.rowDate);
+      if (row && row.entry) {
+        const hasValue = row.entry.desc || row.entry.start || row.entry.end || Number(row.entry.total || 0) > 0;
+        if (hasValue) {
+          openEditShift(row.date);
+        } else {
+          clearShiftForm();
+          els.shiftDate.value = row.date;
+          openShiftModal();
+        }
       }
     });
 
@@ -779,21 +1056,11 @@
       }
     });
 
-    els.saveQuick.addEventListener("click", async () => {
-      try {
-        await saveQuickShift(false);
-      } catch (err) {
-        alert(err.message);
-      }
-    });
-    els.newQuick.addEventListener("click", clearQuickForm);
-    els.deleteQuick.addEventListener("click", async () => {
-      try {
-        await deleteQuickShift();
-      } catch (err) {
-        alert(err.message);
-      }
-    });
+    if (els.settingsSections) {
+      els.settingsSections.addEventListener("input", () => {
+        state.settingsDirty = true;
+      });
+    }
 
     els.adminFilterButtons.forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -882,11 +1149,15 @@
 
     const safeRefresh = async () => {
       if (isRefreshing || !state.me || document.hidden) return;
+      if (state.settingsDirty) return;
+      if (state.activeScreen === "screen-paghe") return;
+      if (els.shiftModal && !els.shiftModal.classList.contains("hidden")) return;
       isRefreshing = true;
       try {
         await refreshMe();
         if (state.me && state.me.approved) {
           await refreshState();
+          await syncQueuedMutations();
         }
       } catch (_err) {
       } finally {
@@ -929,9 +1200,10 @@
     registerSmartRefresh();
 
     try {
-      await refreshMe();
+      await refreshMe({ preferCache: true, silent: true });
       if (state.me && state.me.approved) {
-        await refreshState();
+        await refreshState({ preferCache: true, silent: true });
+        await syncQueuedMutations();
       }
     } catch (err) {
       alert(err.message);
