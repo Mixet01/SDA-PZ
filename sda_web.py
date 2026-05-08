@@ -917,8 +917,36 @@ def resolve_view_user(current_user):
         reg = load_users_registry()
         if find_user(reg, requested):
             target = requested
-            can_edit = False
+            can_edit = True
     return target, can_edit
+
+
+def resolve_edit_user(current_user, payload=None):
+    target = normalize_email(current_user["email"])
+    requested = normalize_email(request.args.get("view_user"))
+    if not requested and isinstance(payload, dict):
+        requested = normalize_email(payload.get("view_user"))
+    if requested and requested != target and current_user.get("role") == "admin":
+        reg = load_users_registry()
+        if find_user(reg, requested):
+            return requested
+    return target
+
+
+def delete_user_everywhere(email):
+    email = normalize_email(email)
+    if DB_MODE:
+        with db_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM app_users WHERE email = %s", (email,))
+        return
+
+    registry = load_users_registry()
+    registry["users"] = [u for u in registry.get("users", []) if normalize_email(u.get("email")) != email]
+    save_users_registry(registry)
+    path = user_data_path(email)
+    if os.path.exists(path):
+        os.remove(path)
 
 
 @app.get("/manifest.webmanifest")
@@ -1162,26 +1190,26 @@ def api_state():
 @app.post("/api/entry")
 @login_required(approved_only=True)
 def api_add_entry():
-    email = g.current_user["email"]
     payload = request.get_json(silent=True) or {}
+    email = resolve_edit_user(g.current_user, payload)
     with lock:
         engine = get_engine_for(email)
         try:
             entry = engine.build_entry(payload)
         except ValueError as exc:
             return jsonify({"ok": False, "message": str(exc)}), 400
-        existing = engine.get_entry(entry["date"])
-        if existing and not engine.is_placeholder_entry(existing):
-            return jsonify({"ok": False, "message": "Quel giorno e gia compilato. Eliminalo prima di aggiungere un nuovo turno."}), 409
+        original_date = str(payload.get("original_date", "")).strip()
+        if original_date and original_date != entry["date"]:
+            engine.remove_entry(original_date)
         engine.upsert_entry(entry)
         engine.save_data()
-    return jsonify({"ok": True, "message": "Turno aggiunto."})
+    return jsonify({"ok": True, "message": "Turno salvato/sovrascritto."})
 
 
 @app.delete("/api/entry/<date_str>")
 @login_required(approved_only=True)
 def api_delete_entry(date_str):
-    email = g.current_user["email"]
+    email = resolve_edit_user(g.current_user)
     with lock:
         engine = get_engine_for(email)
         existing = engine.get_entry(date_str)
@@ -1195,8 +1223,8 @@ def api_delete_entry(date_str):
 @app.post("/api/quick-shift")
 @login_required(approved_only=True)
 def api_quick_shift():
-    email = g.current_user["email"]
     payload = request.get_json(silent=True) or {}
+    email = resolve_edit_user(g.current_user, payload)
     name = str(payload.get("name", "")).strip()
     start = str(payload.get("start", "")).strip()
     end = str(payload.get("end", "")).strip()
@@ -1233,7 +1261,7 @@ def api_quick_shift():
 @app.delete("/api/quick-shift/<int:idx>")
 @login_required(approved_only=True)
 def api_delete_quick_shift(idx):
-    email = g.current_user["email"]
+    email = resolve_edit_user(g.current_user)
     with lock:
         engine = get_engine_for(email)
         if idx < 0 or idx >= len(engine.quick_shifts):
@@ -1248,8 +1276,8 @@ def api_delete_quick_shift(idx):
 @app.post("/api/settings")
 @login_required(approved_only=True)
 def api_settings():
-    email = g.current_user["email"]
     payload = request.get_json(silent=True) or {}
+    email = resolve_edit_user(g.current_user, payload)
     incoming = payload.get("settings", {})
     if not isinstance(incoming, dict):
         return jsonify({"ok": False, "message": "Formato impostazioni non valido."}), 400
@@ -1346,6 +1374,24 @@ def api_admin_set_approval(email):
         target["approved"] = approved
         save_users_registry(registry)
     return jsonify({"ok": True, "message": "Stato approvazione aggiornato."})
+
+
+@app.delete("/api/admin/users/<path:email>")
+@admin_required
+def api_admin_delete_user(email):
+    target_email = normalize_email(email)
+    current_user = g.current_user
+    if target_email == normalize_email(current_user["email"]):
+        return jsonify({"ok": False, "message": "Non puoi eliminare il tuo account admin."}), 400
+
+    registry = load_users_registry()
+    target = find_user(registry, target_email)
+    if not target:
+        return jsonify({"ok": False, "message": "Utente non trovato."}), 404
+
+    with lock:
+        delete_user_everywhere(target_email)
+    return jsonify({"ok": True, "message": "Utente eliminato."})
 
 
 if __name__ == "__main__":

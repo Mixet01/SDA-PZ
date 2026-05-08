@@ -147,3 +147,16 @@ L'app ora include:
 - icona SVG dinamica
 - supporto installazione su Android/desktop
 - supporto "Aggiungi alla schermata Home" su iPhone
+
+## Local First
+
+L'app ora ha una prima struttura local-first:
+
+- cache locale con `IndexedDB`
+- snapshot di `utente` e `stato mese`
+- refresh automatico quando torni sull'app
+- retry di sincronizzazione per alcune operazioni critiche
+
+Nuovo file frontend da caricare sempre:
+
+- `static/local-db.js`
