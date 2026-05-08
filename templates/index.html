@@ -93,23 +93,6 @@
 
         <div id="settings-sections"></div>
 
-        <div class="panel">
-          <h3>Turni Rapidi</h3>
-          <div id="quick-list" class="quick-list"></div>
-          <div class="field-row">
-            <input id="quick-name" type="text" placeholder="Nome turno rapido">
-          </div>
-          <div class="field-row">
-            <input id="quick-start" type="time" value="06:00">
-            <input id="quick-end" type="time" value="14:00">
-          </div>
-          <div class="field-row">
-            <button id="save-quick" class="btn primary">Salva</button>
-            <button id="new-quick" class="btn secondary">Nuovo</button>
-            <button id="delete-quick" class="btn danger">Elimina</button>
-          </div>
-        </div>
-
         <div class="field-row">
           <button id="save-settings" class="btn primary wide">Salva Impostazioni</button>
         </div>
@@ -176,19 +159,13 @@
 
   <div id="shift-modal" class="modal hidden">
     <div class="modal-box">
-      <h3>Nuovo Turno</h3>
+      <h3 id="shift-modal-title">Nuovo Turno</h3>
       <div class="field-row">
         <input id="shift-date" type="date">
       </div>
       <div class="field-row">
         <input id="shift-start" type="time" value="06:00">
         <input id="shift-end" type="time" value="14:00">
-      </div>
-      <div class="field-row">
-        <select id="quick-main">
-          <option value="">Turno rapido</option>
-        </select>
-        <button id="apply-main-quick" class="btn secondary">Applica</button>
       </div>
       <div class="flags-col">
         <label class="flag-card"><input id="flag-festivo" type="checkbox"><span>Festivo lavorato (+goduto)</span></label>
@@ -207,6 +184,7 @@
   {% if google_client_id %}
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   {% endif %}
+  <script src="{{ url_for('static', filename='local-db.js') }}"></script>
   <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>
