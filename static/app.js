@@ -10,6 +10,7 @@
     adminFilter: "all",
     activeScreen: "screen-turni",
     settingsDirty: false,
+    settingsFocused: false,
     editingEntryDate: null,
   };
 
@@ -19,7 +20,6 @@
     pendingGate: document.getElementById("pending-gate"),
     appMain: document.getElementById("app-main"),
     googleSignin: document.getElementById("google-signin"),
-    googleSwitchAuth: document.getElementById("google-switch-auth"),
     devName: document.getElementById("dev-name"),
     devEmail: document.getElementById("dev-email"),
     devLogin: document.getElementById("dev-login"),
@@ -45,8 +45,6 @@
     shiftDate: document.getElementById("shift-date"),
     shiftStart: document.getElementById("shift-start"),
     shiftEnd: document.getElementById("shift-end"),
-    quickMain: document.getElementById("quick-main"),
-    applyMainQuick: document.getElementById("apply-main-quick"),
     flagFestivo: document.getElementById("flag-festivo"),
     flagFestivoGoduto: document.getElementById("flag-festivo-goduto"),
     flagFerie: document.getElementById("flag-ferie"),
@@ -57,14 +55,6 @@
 
     settingsSections: document.getElementById("settings-sections"),
     saveSettings: document.getElementById("save-settings"),
-
-    quickList: document.getElementById("quick-list"),
-    quickName: document.getElementById("quick-name"),
-    quickStart: document.getElementById("quick-start"),
-    quickEnd: document.getElementById("quick-end"),
-    saveQuick: document.getElementById("save-quick"),
-    newQuick: document.getElementById("new-quick"),
-    deleteQuick: document.getElementById("delete-quick"),
 
     adminNavBtn: document.getElementById("admin-nav-btn"),
     bottomNav: document.querySelector(".bottom-nav"),
@@ -81,8 +71,6 @@
     profileOvertime: document.getElementById("profile-overtime"),
     profileBreakdown: document.getElementById("profile-breakdown"),
     exportPdf: document.getElementById("export-pdf"),
-    exportBackup: document.getElementById("export-backup"),
-    switchAccountBtn: document.getElementById("switch-account-btn"),
     logoutProfile: document.getElementById("logout-btn-profile"),
 
     navButtons: Array.from(document.querySelectorAll(".nav-btn")),
@@ -171,9 +159,6 @@
     els.authGate.classList.toggle("hidden", mode !== "auth");
     els.pendingGate.classList.toggle("hidden", mode !== "pending");
     els.appMain.classList.toggle("hidden", mode !== "app");
-    if (els.googleSwitchAuth) {
-      els.googleSwitchAuth.classList.toggle("hidden", mode !== "auth" || !googleClientId);
-    }
   }
 
   function userIsAdmin() {
@@ -203,8 +188,6 @@
     const list = [
       els.fabAdd,
       els.addShift,
-      els.quickMain,
-      els.applyMainQuick,
       els.flagFestivo,
       els.flagFestivoGoduto,
       els.flagFerie,
@@ -213,12 +196,6 @@
       els.shiftStart,
       els.shiftEnd,
       els.saveSettings,
-      els.quickName,
-      els.quickStart,
-      els.quickEnd,
-      els.saveQuick,
-      els.newQuick,
-      els.deleteQuick,
     ];
     list.forEach((el) => {
       if (el) el.disabled = !editable;
@@ -238,7 +215,7 @@
     setEditable(state.canEdit);
     renderShiftList();
     renderTurniSummaryCards();
-    if (!(state.activeScreen === "screen-paghe" && state.settingsDirty)) {
+    if (!(state.activeScreen === "screen-paghe" && (state.settingsDirty || state.settingsFocused))) {
       renderSettings();
     }
     renderProfile();
@@ -304,10 +281,6 @@
     }
   }
 
-  function clearQuickForm() {
-    return;
-  }
-
   function getEntryRows() {
     const rows = (state.view && state.view.rows) || [];
     return rows.filter((r) => r.type === "entry");
@@ -339,6 +312,13 @@
   }
 
   function renderReadonlyInfo() {
+    const adminViewingOtherUser = userIsAdmin() && state.me && state.viewedUser && state.viewedUser !== state.me.email;
+    if (adminViewingOtherUser) {
+      els.readonlyBanner.classList.remove("hidden");
+      els.backToMine.classList.remove("hidden");
+      els.readonlyBanner.textContent = `Modalita admin: stai gestendo turni e paghe di ${state.viewedUser}.`;
+      return;
+    }
     if (state.canEdit) {
       els.readonlyBanner.classList.add("hidden");
       els.backToMine.classList.add("hidden");
@@ -347,39 +327,6 @@
     els.readonlyBanner.classList.remove("hidden");
     els.backToMine.classList.remove("hidden");
     els.readonlyBanner.textContent = `Stai visualizzando i turni di ${state.viewedUser} in sola lettura.`;
-  }
-
-  function renderQuickSelect() {
-    if (!els.quickMain) return;
-    els.quickMain.innerHTML = "<option value=''>Turno rapido</option>";
-    state.quickShifts.forEach((q, idx) => {
-      const opt = document.createElement("option");
-      opt.value = String(idx);
-      opt.textContent = `${q.name} (${q.start}-${q.end})`;
-      els.quickMain.appendChild(opt);
-    });
-  }
-
-  function renderQuickList() {
-    if (!els.quickList) return;
-    els.quickList.innerHTML = "";
-    if (!state.quickShifts.length) {
-      els.quickList.innerHTML = "<div class='empty-state'>Nessun turno rapido.</div>";
-      return;
-    }
-    state.quickShifts.forEach((q, idx) => {
-      const item = document.createElement("div");
-      item.className = `quick-item${state.currentQuickIndex === idx ? " selected" : ""}`;
-      item.innerHTML = `<div><strong>${escapeHtml(q.name)}</strong><div class='sub'>${escapeHtml(q.start)} - ${escapeHtml(q.end)}</div></div><span>›</span>`;
-      item.addEventListener("click", () => {
-        state.currentQuickIndex = idx;
-        els.quickName.value = q.name;
-        els.quickStart.value = q.start;
-        els.quickEnd.value = q.end;
-        renderQuickList();
-      });
-      els.quickList.appendChild(item);
-    });
   }
 
   function renderShiftList() {
@@ -523,17 +470,6 @@
     els.metricTotalEur.textContent = formatEur(metrics.totalEur);
     els.metricTotalHours.textContent = minutesToHoursLabel(metrics.totalMinutes);
     els.metricTotalShifts.textContent = String(metrics.compiled);
-  }
-
-  function applyQuickToShiftForm(index) {
-    if (!els.quickStart || !els.quickEnd) return;
-    const q = state.quickShifts[index];
-    if (!q) {
-      alert("Seleziona prima un turno rapido.");
-      return;
-    }
-    els.shiftStart.value = q.start;
-    els.shiftEnd.value = q.end;
   }
 
   function renderAdminStatsAndList() {
@@ -729,28 +665,6 @@
     showGate("auth");
   }
 
-  async function switchAccount() {
-    if (window.google && window.google.accounts && window.google.accounts.id) {
-      window.google.accounts.id.disableAutoSelect();
-    }
-    await api("/auth/logout", { method: "POST" });
-    await localSet(meCacheKey(), { ok: true, logged_in: false, user: null });
-    state.me = null;
-    state.viewedUser = null;
-    showGate("auth");
-    if (els.googleSignin) {
-      els.googleSignin.innerHTML = "";
-    }
-    initGoogleSignIn();
-    setTimeout(() => {
-      if (window.google && window.google.accounts && window.google.accounts.id) {
-        try {
-          window.google.accounts.id.prompt();
-        } catch (_e) {}
-      }
-    }, 250);
-  }
-
   async function addShift() {
     if (!state.canEdit) return;
     const payload = {
@@ -891,46 +805,6 @@
     }
   }
 
-  async function saveQuickShift(overwrite = false) {
-    if (!els.quickName || !els.quickStart || !els.quickEnd) return;
-    if (!state.canEdit) return;
-    const payload = {
-      name: els.quickName.value.trim(),
-      start: els.quickStart.value,
-      end: els.quickEnd.value,
-      overwrite,
-    };
-    if (Number.isInteger(state.currentQuickIndex)) payload.index = state.currentQuickIndex;
-    try {
-      await api("/api/quick-shift", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-    } catch (err) {
-      const code = err.payload && err.payload.error_code;
-      if (code === "DUPLICATE_NAME" && confirm(err.message)) return saveQuickShift(true);
-      throw err;
-    }
-    clearQuickForm();
-    await refreshState();
-  }
-
-  async function deleteQuickShift() {
-    if (!els.quickList) return;
-    if (!state.canEdit) return;
-    if (!Number.isInteger(state.currentQuickIndex)) {
-      alert("Seleziona un turno rapido.");
-      return;
-    }
-    const q = state.quickShifts[state.currentQuickIndex];
-    if (!q) return;
-    if (!confirm(`Eliminare turno rapido '${q.name}'?`)) return;
-    await api(`/api/quick-shift/${state.currentQuickIndex}`, { method: "DELETE" });
-    clearQuickForm();
-    await refreshState();
-  }
-
   async function syncQueuedMutations() {
     if (!localDB || syncInFlight || !state.me) return;
     syncInFlight = true;
@@ -983,11 +857,6 @@
         shape: "pill",
         text: "continue_with",
       });
-      const params = new URLSearchParams(window.location.search);
-      if (params.get("switch_account") === "1") {
-        window.google.accounts.id.disableAutoSelect();
-        window.google.accounts.id.prompt();
-      }
     };
     waitGoogle();
   }
@@ -1009,12 +878,6 @@
       if (e.target === els.shiftModal) closeShiftModal();
     });
 
-    if (els.applyMainQuick && els.quickMain) {
-      els.applyMainQuick.addEventListener("click", () => {
-        if (els.quickMain.value === "") return alert("Seleziona un turno rapido.");
-        applyQuickToShiftForm(Number(els.quickMain.value));
-      });
-    }
     els.addShift.addEventListener("click", async () => {
       try {
         await addShift();
@@ -1060,6 +923,14 @@
       els.settingsSections.addEventListener("input", () => {
         state.settingsDirty = true;
       });
+      els.settingsSections.addEventListener("focusin", () => {
+        state.settingsFocused = true;
+      });
+      els.settingsSections.addEventListener("focusout", () => {
+        setTimeout(() => {
+          state.settingsFocused = !!document.activeElement && !!document.activeElement.closest && !!document.activeElement.closest("#settings-sections");
+        }, 0);
+      });
     }
 
     els.adminFilterButtons.forEach((btn) => {
@@ -1086,16 +957,7 @@
         alert(err.message);
       }
     };
-    const doSwitchAccount = async () => {
-      try {
-        await switchAccount();
-      } catch (err) {
-        alert(err.message);
-      }
-    };
     els.logoutProfile.addEventListener("click", doLogout);
-    if (els.switchAccountBtn) els.switchAccountBtn.addEventListener("click", doSwitchAccount);
-    if (els.googleSwitchAuth) els.googleSwitchAuth.addEventListener("click", doSwitchAccount);
     if (els.pendingLogout) els.pendingLogout.addEventListener("click", doLogout);
 
     if (els.devLogin) {
@@ -1126,14 +988,6 @@
       window.open(`/api/export-month-html?${params.toString()}`, "_blank");
     });
 
-    els.exportBackup.addEventListener("click", () => {
-      const params = new URLSearchParams();
-      if (userIsAdmin() && state.viewedUser && state.viewedUser !== state.me.email) {
-        params.set("view_user", state.viewedUser);
-      }
-      const q = params.toString();
-      window.location.href = q ? `/api/export-backup?${q}` : "/api/export-backup";
-    });
   }
 
   function registerServiceWorker() {
