@@ -917,20 +917,12 @@ def resolve_view_user(current_user):
         reg = load_users_registry()
         if find_user(reg, requested):
             target = requested
-            can_edit = True
+            can_edit = False
     return target, can_edit
 
 
 def resolve_edit_user(current_user, payload=None):
-    target = normalize_email(current_user["email"])
-    requested = normalize_email(request.args.get("view_user"))
-    if not requested and isinstance(payload, dict):
-        requested = normalize_email(payload.get("view_user"))
-    if requested and requested != target and current_user.get("role") == "admin":
-        reg = load_users_registry()
-        if find_user(reg, requested):
-            return requested
-    return target
+    return normalize_email(current_user["email"])
 
 
 def delete_user_everywhere(email):
@@ -994,7 +986,7 @@ def apple_touch_icon():
 @app.get("/service-worker.js")
 def service_worker():
     script = """
-const CACHE_NAME = "sda-pwa-v5";
+const CACHE_NAME = "sda-pwa-v6";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",

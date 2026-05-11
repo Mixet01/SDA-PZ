@@ -148,15 +148,11 @@ L'app ora include:
 - supporto installazione su Android/desktop
 - supporto "Aggiungi alla schermata Home" su iPhone
 
-## Local First
+## Prestazioni
 
-L'app ora ha una prima struttura local-first:
+L'app ora usa un flusso piu semplice e diretto:
 
-- cache locale con `IndexedDB`
-- snapshot di `utente` e `stato mese`
-- refresh automatico quando torni sull'app
-- retry di sincronizzazione per alcune operazioni critiche
-
-Nuovo file frontend da caricare sempre:
-
-- `static/local-db.js`
+- dati letti e salvati dal server/Supabase
+- niente cache locale `IndexedDB`
+- refresh leggero solo quando torni nell'app o riprende il focus
+- admin in sola visualizzazione sui dati degli altri utenti
