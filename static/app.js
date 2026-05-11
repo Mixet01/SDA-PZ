@@ -73,9 +73,12 @@
   const googleClientId = (els.body.dataset.googleClientId || "").trim();
   const pwaAppName = (els.body.dataset.pwaAppName || "I Miei Turni").trim();
   const monthFormatter = new Intl.DateTimeFormat("it-IT", { month: "long", year: "numeric" });
+  const euroFormatter = new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" });
+  const monthShortFormatter = new Intl.DateTimeFormat("it-IT", { month: "short" });
+  const weekdayFormatter = new Intl.DateTimeFormat("it-IT", { weekday: "short" });
 
   function formatEur(num) {
-    return `EUR ${Number(num || 0).toFixed(2)}`;
+    return euroFormatter.format(Number(num || 0));
   }
 
   function minutesToHoursLabel(mins) {
@@ -89,6 +92,67 @@
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#39;");
+  }
+
+  function safeDate(dateStr) {
+    const dateObj = new Date(`${dateStr}T12:00:00`);
+    return Number.isNaN(dateObj.getTime()) ? null : dateObj;
+  }
+
+  function formatShiftDateParts(dateStr) {
+    const dateObj = safeDate(dateStr);
+    if (!dateObj) {
+      return { day: "--", month: "---", weekday: "" };
+    }
+    return {
+      day: String(dateObj.getDate()).padStart(2, "0"),
+      month: monthShortFormatter.format(dateObj).replace(".", "").toUpperCase(),
+      weekday: weekdayFormatter.format(dateObj).replace(".", ""),
+    };
+  }
+
+  function hhmmToCompactLabel(value) {
+    const [hoursRaw, minutesRaw] = String(value || "").split(":");
+    const hours = Number(hoursRaw || 0);
+    const minutes = Number(minutesRaw || 0);
+    if (!hours && !minutes) return "0h";
+    if (!minutes) return `${hours}h`;
+    return `${hours}h ${String(minutes).padStart(2, "0")}m`;
+  }
+
+  function buildShiftTitle(row, hasValue) {
+    if (!hasValue) return "Giornata libera";
+    const raw = String(row.desc_display || "").trim();
+    if (!raw || raw === "-") return "Turno lavorato";
+    if (raw === "Lavorato") return "Turno lavorato";
+    return raw.replace("(+Goduto)", "+ goduto");
+  }
+
+  function buildShiftMeta(row, hasValue) {
+    const start = row.start_display || "-";
+    const end = row.end_display || "-";
+    const entry = row.entry || {};
+    if (start !== "-" && end !== "-") {
+      return `${start} -> ${end}`;
+    }
+    if (entry.ferie) return "Assenza retribuita";
+    if (entry.malattia) return "Giornata di malattia";
+    if (entry.festivo_goduto && !entry.festivo) return "Recupero festivo";
+    return hasValue ? "Valore giornaliero applicato" : (state.canEdit ? "Tocca per inserire un turno" : "Nessun turno inserito");
+  }
+
+  function buildShiftHours(row, hasValue) {
+    if (row.hours_display && row.hours_display !== "-") {
+      return `${hhmmToCompactLabel(row.hours_display)} lavorate`;
+    }
+    return hasValue ? "Compenso giornaliero calcolato" : "Nessuna attivita registrata";
+  }
+
+  function iconMarkup(name) {
+    const icons = {
+      trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M7 7l1 12h8l1-12"/><path d="M10 11v5"/><path d="M14 11v5"/></svg>',
+    };
+    return icons[name] || "";
   }
 
   async function api(url, options = {}) {
@@ -283,26 +347,32 @@
 
     rows.forEach((row) => {
       const date = row.date || "";
-      const totalText = row.total_display === "-" ? "EUR 0.00" : `EUR ${row.total_display}`;
-      const detail = row.detail_display || row.desc_display || "-";
-      const start = row.start_display || "-";
-      const end = row.end_display || "-";
       const hasValue = row.entry && (row.entry.desc || row.entry.start || row.entry.end || Number(row.entry.total || 0) > 0);
       const canDelete = state.canEdit && hasValue;
+      const dateParts = formatShiftDateParts(date);
+      const title = buildShiftTitle(row, hasValue);
+      const meta = buildShiftMeta(row, hasValue);
+      const hours = buildShiftHours(row, hasValue);
+      const totalText = hasValue ? formatEur(row.entry.total || 0) : "—";
 
       const card = document.createElement("article");
-      card.className = "shift-card";
+      card.className = `shift-card ${hasValue ? "has-entry" : "is-empty"}`;
       card.dataset.rowDate = date;
       card.innerHTML = `
-        <div>
-          <div class="shift-date">${escapeHtml(row.display_date || date)}</div>
-          <div class="shift-time">${escapeHtml(start)}<br>${escapeHtml(end)}</div>
+        <div class="shift-date-block">
+          <div class="shift-day">${escapeHtml(dateParts.day)}</div>
+          <div class="shift-month">${escapeHtml(dateParts.month)}</div>
+          <div class="shift-weekday">${escapeHtml(dateParts.weekday)}</div>
         </div>
-        <div>
-          <div class="shift-desc">${escapeHtml(detail)}</div>
-          ${canDelete ? `<div class="shift-actions"><button class="trash-btn" title="Elimina turno" data-delete-date="${escapeHtml(date)}">&#128465;</button></div>` : ""}
+        <div class="shift-main">
+          <div class="shift-title">${escapeHtml(title)}</div>
+          <div class="shift-meta">${escapeHtml(meta)}</div>
+          <div class="shift-hours">${escapeHtml(hours)}</div>
         </div>
-        <div class="shift-total">${escapeHtml(totalText)}</div>
+        <div class="shift-side">
+          <div class="shift-total">${escapeHtml(totalText)}</div>
+          ${canDelete ? `<div class="shift-actions"><button class="trash-btn" title="Elimina turno" data-delete-date="${escapeHtml(date)}">${iconMarkup("trash")}</button></div>` : "" }
+        </div>
       `;
       els.shiftList.appendChild(card);
     });
@@ -383,16 +453,16 @@
     const users = state.adminUsers || [];
     const pending = users.filter((user) => !user.approved).length;
     const approved = users.filter((user) => user.approved).length;
+    const admins = users.filter((user) => user.role === "admin").length;
 
     els.adminTotal.textContent = String(users.length);
     els.adminPending.textContent = String(pending);
     els.adminApproved.textContent = String(approved);
-    els.adminDenied.textContent = "0";
+    els.adminDenied.textContent = String(admins);
 
     let filtered = users;
     if (state.adminFilter === "pending") filtered = users.filter((user) => !user.approved);
     if (state.adminFilter === "approved") filtered = users.filter((user) => user.approved);
-    if (state.adminFilter === "denied") filtered = [];
 
     if (!filtered.length) {
       els.adminUsersList.innerHTML = "<div class='empty-state'>Nessun utente.</div>";
@@ -413,13 +483,13 @@
           <span class="badge ${badgeClass}">${badgeText}</span>
         </div>
         <div class="user-mail">${escapeHtml(user.email)}</div>
-        <div class="user-meta">Registrato: ${escapeHtml(user.created_at || "-")} · Turni: ${escapeHtml(String(user.compiled_days || 0))}</div>
+        <div class="user-meta">Registrato: ${escapeHtml(user.created_at || "-")} | Turni: ${escapeHtml(String(user.compiled_days || 0))}</div>
         <div class="user-actions"></div>
       `;
       const actions = card.querySelector(".user-actions");
 
       const viewButton = document.createElement("button");
-      viewButton.className = "btn primary";
+      viewButton.className = "btn secondary";
       viewButton.textContent = "Visualizza";
       viewButton.addEventListener("click", async () => {
         state.viewedUser = user.email;
