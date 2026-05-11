@@ -8,6 +8,9 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="{{ pwa_short_name }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="manifest" href="{{ url_for('manifest_webmanifest') }}">
   <link rel="icon" href="{{ pwa_icon_href }}">
   <link rel="apple-touch-icon" sizes="180x180" href="{{ pwa_apple_icon_href }}">
@@ -63,22 +66,31 @@
           <button id="month-next" class="icon-btn" aria-label="Mese successivo">&#8250;</button>
         </div>
 
-        <div class="stats-grid">
-          <article class="mini-card accent-green">
-            <span class="ico">💸</span>
-            <span class="cap">Totale</span>
-            <strong id="metric-total-eur">€0.00</strong>
+        <div class="hero-stats">
+          <article class="stat-card stat-card-primary tone-primary">
+            <span class="stat-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h13A2.5 2.5 0 0 1 21 7.5v9A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5z"/><path d="M3 9h18"/><circle cx="16.5" cy="14" r="1.5"/></svg>
+            </span>
+            <span class="stat-label">Totale del mese</span>
+            <strong id="metric-total-eur" class="stat-value">€0,00</strong>
+            <span class="stat-note">Compenso stimato</span>
           </article>
-          <article class="mini-card accent-blue">
-            <span class="ico">🕒</span>
-            <span class="cap">Ore</span>
-            <strong id="metric-total-hours">0.0h</strong>
-          </article>
-          <article class="mini-card accent-yellow">
-            <span class="ico">📅</span>
-            <span class="cap">Turni</span>
-            <strong id="metric-total-shifts">0</strong>
-          </article>
+          <div class="stat-stack">
+            <article class="stat-card stat-card-small tone-cyan">
+              <span class="stat-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.8v4.6l3 1.8"/></svg>
+              </span>
+              <span class="stat-label">Ore</span>
+              <strong id="metric-total-hours" class="stat-value-small">0.0h</strong>
+            </article>
+            <article class="stat-card stat-card-small tone-success">
+              <span class="stat-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="14" rx="3"/><path d="M8 3.5v4"/><path d="M16 3.5v4"/><path d="M4 9.5h16"/></svg>
+              </span>
+              <span class="stat-label">Turni</span>
+              <strong id="metric-total-shifts" class="stat-value-small">0</strong>
+            </article>
+          </div>
         </div>
 
         <div id="shift-list" class="shift-list"></div>
@@ -103,18 +115,41 @@
           <p class="sub">Gestione accessi utenti</p>
         </header>
 
-        <div class="stats-grid admin-stats">
-          <article class="mini-card"><span class="ico">👥</span><span class="cap">Totali</span><strong id="admin-total">0</strong></article>
-          <article class="mini-card"><span class="ico">⏳</span><span class="cap">In attesa</span><strong id="admin-pending">0</strong></article>
-          <article class="mini-card"><span class="ico">✅</span><span class="cap">Approvati</span><strong id="admin-approved">0</strong></article>
-          <article class="mini-card"><span class="ico">🚫</span><span class="cap">Negati</span><strong id="admin-denied">0</strong></article>
+        <div class="admin-overview">
+          <article class="stat-card stat-card-compact tone-primary">
+            <span class="stat-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M16 19v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1"/><circle cx="9.5" cy="7.5" r="3.5"/><path d="M22 19v-1a4 4 0 0 0-3-3.87"/><path d="M16 4.5a3.5 3.5 0 0 1 0 6.8"/></svg>
+            </span>
+            <span class="stat-label">Utenti</span>
+            <strong id="admin-total" class="stat-value-small">0</strong>
+          </article>
+          <article class="stat-card stat-card-compact tone-amber">
+            <span class="stat-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M7 4h10"/><path d="M9 4v3c0 1.3.5 2.6 1.5 3.5L12 12l-1.5 1.5A5 5 0 0 0 9 17v3"/><path d="M15 4v3c0 1.3-.5 2.6-1.5 3.5L12 12l1.5 1.5A5 5 0 0 1 15 17v3"/><path d="M7 20h10"/></svg>
+            </span>
+            <span class="stat-label">In attesa</span>
+            <strong id="admin-pending" class="stat-value-small">0</strong>
+          </article>
+          <article class="stat-card stat-card-compact tone-success">
+            <span class="stat-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="m7.5 12 2.7 2.7 6.3-6.4"/><circle cx="12" cy="12" r="8.5"/></svg>
+            </span>
+            <span class="stat-label">Approvati</span>
+            <strong id="admin-approved" class="stat-value-small">0</strong>
+          </article>
+          <article class="stat-card stat-card-compact tone-slate">
+            <span class="stat-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 3l7 4v5c0 4.4-2.9 7.9-7 9-4.1-1.1-7-4.6-7-9V7z"/><path d="M9.5 12.5 11 14l3.5-4"/></svg>
+            </span>
+            <span class="stat-label">Admin</span>
+            <strong id="admin-denied" class="stat-value-small">0</strong>
+          </article>
         </div>
 
         <div class="chips">
           <button class="chip active" data-admin-filter="all">Tutti</button>
           <button class="chip" data-admin-filter="pending">In attesa</button>
           <button class="chip" data-admin-filter="approved">Approvati</button>
-          <button class="chip" data-admin-filter="denied">Negati</button>
         </div>
 
         <div id="admin-users-list" class="admin-users-list"></div>
@@ -125,11 +160,35 @@
           <h1>Riepilogo del Mese</h1>
         </header>
 
-        <div class="stats-grid two-cols">
-          <article class="mini-card"><span class="ico">💰</span><strong id="profile-total-eur">€0.00</strong><span class="cap">Guadagno</span></article>
-          <article class="mini-card"><span class="ico">🕐</span><strong id="profile-total-hours">0.0h</strong><span class="cap">Ore Totali</span></article>
-          <article class="mini-card"><span class="ico">📆</span><strong id="profile-total-shifts">0</strong><span class="cap">Turni</span></article>
-          <article class="mini-card"><span class="ico">📈</span><strong id="profile-overtime">0.0h</strong><span class="cap">Straordinari</span></article>
+        <div class="profile-stats">
+          <article class="stat-card stat-card-compact tone-primary">
+            <span class="stat-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h13A2.5 2.5 0 0 1 21 7.5v9A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5z"/><path d="M3 9h18"/><circle cx="16.5" cy="14" r="1.5"/></svg>
+            </span>
+            <strong id="profile-total-eur" class="stat-value-small">€0,00</strong>
+            <span class="stat-label">Guadagno</span>
+          </article>
+          <article class="stat-card stat-card-compact tone-cyan">
+            <span class="stat-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.8v4.6l3 1.8"/></svg>
+            </span>
+            <strong id="profile-total-hours" class="stat-value-small">0.0h</strong>
+            <span class="stat-label">Ore Totali</span>
+          </article>
+          <article class="stat-card stat-card-compact tone-success">
+            <span class="stat-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="14" rx="3"/><path d="M8 3.5v4"/><path d="M16 3.5v4"/><path d="M4 9.5h16"/></svg>
+            </span>
+            <strong id="profile-total-shifts" class="stat-value-small">0</strong>
+            <span class="stat-label">Turni</span>
+          </article>
+          <article class="stat-card stat-card-compact tone-amber">
+            <span class="stat-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M5 15 9 11l3 3 7-7"/><path d="M14 7h5v5"/></svg>
+            </span>
+            <strong id="profile-overtime" class="stat-value-small">0.0h</strong>
+            <span class="stat-label">Straordinari</span>
+          </article>
         </div>
 
         <div class="panel">
@@ -144,13 +203,27 @@
       </section>
     </main>
 
-    <button id="fab-add-turno" class="fab" aria-label="Aggiungi turno">+</button>
+    <button id="fab-add-turno" class="fab" aria-label="Aggiungi turno">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+    </button>
 
     <nav class="bottom-nav">
-      <button class="nav-btn active" data-screen="screen-turni"><span>📅</span><small>Turni</small></button>
-      <button class="nav-btn" data-screen="screen-paghe"><span>💶</span><small>Paghe</small></button>
-      <button id="admin-nav-btn" class="nav-btn hidden" data-screen="screen-admin"><span>🛡️</span><small>Admin</small></button>
-      <button class="nav-btn" data-screen="screen-profile"><span>👤</span><small>Profilo</small></button>
+      <button class="nav-btn active" data-screen="screen-turni">
+        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="14" rx="3"/><path d="M8 3.5v4"/><path d="M16 3.5v4"/><path d="M4 9.5h16"/></svg></span>
+        <small>Turni</small>
+      </button>
+      <button class="nav-btn" data-screen="screen-paghe">
+        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h13A2.5 2.5 0 0 1 21 7.5v9A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5z"/><path d="M3 9h18"/><circle cx="16.5" cy="14" r="1.5"/></svg></span>
+        <small>Paghe</small>
+      </button>
+      <button id="admin-nav-btn" class="nav-btn hidden" data-screen="screen-admin">
+        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l7 4v5c0 4.4-2.9 7.9-7 9-4.1-1.1-7-4.6-7-9V7z"/><path d="M9.5 12.5 11 14l3.5-4"/></svg></span>
+        <small>Admin</small>
+      </button>
+      <button class="nav-btn" data-screen="screen-profile">
+        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 19a7 7 0 0 1 14 0"/></svg></span>
+        <small>Profilo</small>
+      </button>
     </nav>
   </div>
 
