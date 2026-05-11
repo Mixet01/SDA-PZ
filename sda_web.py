@@ -986,7 +986,7 @@ def apple_touch_icon():
 @app.get("/service-worker.js")
 def service_worker():
     script = """
-const CACHE_NAME = "sda-pwa-v6";
+const CACHE_NAME = "sda-pwa-v7";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
