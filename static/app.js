@@ -8,6 +8,8 @@
     adminUsers: [],
     adminFilter: "all",
     activeScreen: "screen-turni",
+    vacationYear: new Date().getFullYear(),
+    vacations: null,
     settingsDirty: false,
     settingsFocused: false,
     editingEntryDate: null,
@@ -64,6 +66,13 @@
     profileTotalShifts: document.getElementById("profile-total-shifts"),
     profileOvertime: document.getElementById("profile-overtime"),
     profileBreakdown: document.getElementById("profile-breakdown"),
+    vacationPrev: document.getElementById("vacation-prev"),
+    vacationNext: document.getElementById("vacation-next"),
+    vacationYearLabel: document.getElementById("vacation-year-label"),
+    vacationTotalDays: document.getElementById("vacation-total-days"),
+    vacationMonthsUsed: document.getElementById("vacation-months-used"),
+    vacationMonths: document.getElementById("vacation-months"),
+    vacationList: document.getElementById("vacation-list"),
     exportPdf: document.getElementById("export-pdf"),
     logoutProfile: document.getElementById("logout-btn-profile"),
     navButtons: Array.from(document.querySelectorAll(".nav-btn")),
@@ -437,6 +446,38 @@
     els.profileBreakdown.innerHTML = keys.length
       ? keys.map((key) => `<div class="breakdown-item"><span>${escapeHtml(key)}</span><strong>${escapeHtml(minutesToHoursLabel(metrics.breakdown[key]))}</strong></div>`).join("")
       : "<div class='empty-state'>Nessun dettaglio ore.</div>";
+  }
+
+  function renderVacations() {
+    const data = state.vacations || { total_days: 0, months_used: 0, months: [], days: [] };
+    els.vacationYearLabel.textContent = String(state.vacationYear);
+    els.vacationTotalDays.textContent = String(data.total_days || 0);
+    els.vacationMonthsUsed.textContent = String(data.months_used || 0);
+
+    els.vacationMonths.innerHTML = (data.months || [])
+      .map((month) => {
+        const active = Number(month.count || 0) > 0 ? "active" : "";
+        return `
+          <article class="vacation-month ${active}">
+            <span>${escapeHtml(month.month_name)}</span>
+            <strong>${escapeHtml(String(month.count || 0))}</strong>
+          </article>
+        `;
+      })
+      .join("");
+
+    const days = data.days || [];
+    els.vacationList.innerHTML = days.length
+      ? days.map((day) => `
+        <article class="vacation-day">
+          <div>
+            <strong>${escapeHtml(day.display_date)}</strong>
+            <span>${escapeHtml(day.month_name)}</span>
+          </div>
+          <span>${formatEur(Number(day.total_display || 0))}</span>
+        </article>
+      `).join("")
+      : "<div class='empty-state'>Nessuna ferie segnata per questo anno.</div>";
   }
 
   function renderAdminStatsAndList() {
