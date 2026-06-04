@@ -240,6 +240,7 @@
     els.shiftEnd.value = "14:00";
     els.flagFestivo.checked = false;
     els.flagFestivoGoduto.checked = false;
+    els.flagFestivoGoduto.disabled = false;
     els.flagFerie.checked = false;
     els.flagMalattia.checked = false;
     els.shiftModalTitle.textContent = "Nuovo Turno";
@@ -259,12 +260,8 @@
 
   function syncShiftFlags() {
     if (els.flagFestivo.checked) {
-      els.flagFestivoGoduto.checked = true;
-      els.flagFestivoGoduto.disabled = true;
       els.flagFerie.checked = false;
       els.flagMalattia.checked = false;
-    } else {
-      els.flagFestivoGoduto.disabled = false;
     }
 
     if (els.flagFestivoGoduto.checked && !els.flagFestivo.checked) {
@@ -275,14 +272,12 @@
     if (els.flagFerie.checked) {
       els.flagFestivo.checked = false;
       els.flagFestivoGoduto.checked = false;
-      els.flagFestivoGoduto.disabled = false;
       els.flagMalattia.checked = false;
     }
 
     if (els.flagMalattia.checked) {
       els.flagFestivo.checked = false;
       els.flagFestivoGoduto.checked = false;
-      els.flagFestivoGoduto.disabled = false;
       els.flagFerie.checked = false;
     }
   }
@@ -686,6 +681,7 @@
     els.shiftEnd.value = entry.end || "14:00";
     els.flagFestivo.checked = Boolean(entry.festivo);
     els.flagFestivoGoduto.checked = Boolean(entry.festivo_goduto);
+    els.flagFestivoGoduto.disabled = false;
     els.flagFerie.checked = Boolean(entry.ferie);
     els.flagMalattia.checked = Boolean(entry.malattia);
     els.editLabel.textContent = `Modifica il turno del ${dateStr} e salva.`;
