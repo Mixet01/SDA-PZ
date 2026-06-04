@@ -33,6 +33,21 @@ USERS_FILE = os.path.join(DATA_ROOT, "utenti_sda.json")
 USER_DATA_DIR = os.path.join(DATA_ROOT, "user_data")
 
 DEFAULT_SETTINGS = {
+    "BASE_GIORNO": 10.61,
+    "BASE_NOTTE": 12.20150,
+    "OT_GIORNO": 15.91500,
+    "OT_NOTTE": 17.50650,
+    "SABATO_GIORNO": 15.91500,
+    "SABATO_NOTTE": 17.50650,
+    "FESTIVO_GIORNALIERO": 17.50650,
+    "FESTIVO_NOTTURNO": 17.50650,
+    "FERIE": round(10.61 * 8, 2),
+    "MALATTIA": round(10.61 * 8, 2),
+    "FESTIVO_GODUTO": round(10.61 * 8, 2),
+    "SOGLIA_STRAORDINARIO": 8,
+}
+
+LEGACY_DEFAULT_SETTINGS = {
     "BASE_GIORNO": 10,
     "BASE_NOTTE": 12,
     "OT_GIORNO": 14,
@@ -63,10 +78,32 @@ class SDAEngine:
         self.settings = copy.deepcopy(DEFAULT_SETTINGS)
         self.data = []
         self.quick_shifts = self.default_quick_shifts()
+        self.needs_save = False
         self.load_data()
+        if self.needs_save:
+            self.recalculate_all()
+            self.save_data()
 
     def default_quick_shifts(self):
         return copy.deepcopy(DEFAULT_QUICK_SHIFTS)
+
+    def normalize_settings(self, stored_settings):
+        normalized = copy.deepcopy(DEFAULT_SETTINGS)
+        upgraded = False
+        for key, value in (stored_settings or {}).items():
+            if key not in DEFAULT_SETTINGS:
+                continue
+            try:
+                numeric = float(value)
+            except (TypeError, ValueError):
+                continue
+            legacy = LEGACY_DEFAULT_SETTINGS.get(key)
+            if legacy is not None and abs(numeric - float(legacy)) < 0.00001:
+                normalized[key] = DEFAULT_SETTINGS[key]
+                upgraded = True
+            else:
+                normalized[key] = numeric
+        return normalized, upgraded
 
     def parse_time_or_default(self, value, fallback):
         try:
@@ -228,8 +265,10 @@ class SDAEngine:
 
         desc = "Lavorato"
         if festivo:
-            details["FESTIVO_GODUTO"] = details.get("FESTIVO_GODUTO", 0) + 480
-            desc = "Lavorato Festivo (+Goduto)"
+            desc = "Lavorato Festivo"
+            if festivo_goduto:
+                details["FESTIVO_GODUTO"] = details.get("FESTIVO_GODUTO", 0) + 480
+                desc = "Lavorato Festivo (+Goduto)"
 
         total = 0.0
         for voce, minutes in details.items():
@@ -450,8 +489,8 @@ class SDAEngine:
 
     def apply_payload(self, payload):
         content = payload or {}
-        self.settings = copy.deepcopy(DEFAULT_SETTINGS)
-        self.settings.update(content.get("settings", {}))
+        self.settings, upgraded_settings = self.normalize_settings(content.get("settings"))
+        self.needs_save = self.needs_save or upgraded_settings
         self.quick_shifts = self.sanitize_quick_shifts(content.get("quick_shifts"))
         self.data = content.get("data", [])
         for entry in self.data:
@@ -986,7 +1025,7 @@ def apple_touch_icon():
 @app.get("/service-worker.js")
 def service_worker():
     script = """
-const CACHE_NAME = "sda-pwa-v7";
+const CACHE_NAME = "sda-pwa-v8";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
