@@ -36,16 +36,19 @@ DEFAULT_SETTINGS = {
     "BASE_GIORNO": 10.61,
     "BASE_NOTTE": 12.20150,
     "OT_GIORNO": 15.91500,
-    "OT_NOTTE": 17.50650,
+    "OT_NOTTE": 0,
     "SABATO_GIORNO": 15.91500,
-    "SABATO_NOTTE": 17.50650,
+    "SABATO_NOTTE": 0,
     "FESTIVO_GIORNALIERO": 17.50650,
-    "FESTIVO_NOTTURNO": 17.50650,
+    "FESTIVO_NOTTURNO": 0,
     "FERIE": round(10.61 * 8, 2),
     "MALATTIA": round(10.61 * 8, 2),
     "FESTIVO_GODUTO": round(10.61 * 8, 2),
     "SOGLIA_STRAORDINARIO": 8,
 }
+
+CURRENT_SETTINGS_VERSION = 3
+FESTIVO_GODUTO_MIGRATION_VERSION = 1
 
 LEGACY_DEFAULT_SETTINGS = {
     "BASE_GIORNO": 10,
@@ -70,6 +73,22 @@ DEFAULT_QUICK_SHIFTS = [
     {"name": "Part-time Sera", "start": "18:00", "end": "22:00"},
 ]
 
+MONTH_NAMES_IT = [
+    "",
+    "Gennaio",
+    "Febbraio",
+    "Marzo",
+    "Aprile",
+    "Maggio",
+    "Giugno",
+    "Luglio",
+    "Agosto",
+    "Settembre",
+    "Ottobre",
+    "Novembre",
+    "Dicembre",
+]
+
 
 class SDAEngine:
     def __init__(self, data_file, user_email=None):
@@ -79,6 +98,8 @@ class SDAEngine:
         self.data = []
         self.quick_shifts = self.default_quick_shifts()
         self.needs_save = False
+        self.settings_version = CURRENT_SETTINGS_VERSION
+        self.festivo_goduto_migration_version = FESTIVO_GODUTO_MIGRATION_VERSION
         self.load_data()
         if self.needs_save:
             self.recalculate_all()
@@ -87,7 +108,14 @@ class SDAEngine:
     def default_quick_shifts(self):
         return copy.deepcopy(DEFAULT_QUICK_SHIFTS)
 
-    def normalize_settings(self, stored_settings):
+    def normalize_settings(self, stored_settings, stored_version=0):
+        try:
+            version = int(stored_version or 0)
+        except (TypeError, ValueError):
+            version = 0
+        if version < CURRENT_SETTINGS_VERSION:
+            return copy.deepcopy(DEFAULT_SETTINGS), True
+
         normalized = copy.deepcopy(DEFAULT_SETTINGS)
         upgraded = False
         for key, value in (stored_settings or {}).items():
@@ -104,6 +132,14 @@ class SDAEngine:
             else:
                 normalized[key] = numeric
         return normalized, upgraded
+
+    def migrate_auto_festivo_goduto(self):
+        changed = False
+        for entry in self.data:
+            if entry.get("festivo") and entry.get("festivo_goduto"):
+                entry["festivo_goduto"] = False
+                changed = True
+        return changed
 
     def parse_time_or_default(self, value, fallback):
         try:
@@ -386,6 +422,46 @@ class SDAEngine:
         )
         return {"rows": rows, "summary_text": summary_text, "report_text": self.build_report(entries, month, year)}
 
+    def build_vacation_view(self, year):
+        days = []
+        by_month = {idx: 0 for idx in range(1, 13)}
+        for entry in sorted(self.data, key=lambda x: x.get("date", "")):
+            if not entry.get("ferie"):
+                continue
+            try:
+                d_obj = datetime.strptime(entry["date"], "%Y-%m-%d")
+            except (KeyError, ValueError):
+                continue
+            if d_obj.year != year:
+                continue
+            by_month[d_obj.month] += 1
+            days.append(
+                {
+                    "date": entry["date"],
+                    "display_date": d_obj.strftime("%d/%m/%Y"),
+                    "day": d_obj.day,
+                    "month": d_obj.month,
+                    "month_name": MONTH_NAMES_IT[d_obj.month],
+                    "weekday": d_obj.strftime("%a"),
+                    "total_display": f"{float(entry.get('total', 0) or 0):.2f}",
+                }
+            )
+        months = [
+            {
+                "month": idx,
+                "month_name": MONTH_NAMES_IT[idx],
+                "count": by_month[idx],
+            }
+            for idx in range(1, 13)
+        ]
+        return {
+            "year": year,
+            "total_days": len(days),
+            "months_used": sum(1 for item in months if item["count"] > 0),
+            "months": months,
+            "days": days,
+        }
+
     def build_report(self, entries, month, year):
         total_eur = 0.0
         total_minutes = 0
@@ -482,6 +558,8 @@ class SDAEngine:
 
     def to_payload(self):
         return {
+            "settings_version": CURRENT_SETTINGS_VERSION,
+            "festivo_goduto_migration_version": FESTIVO_GODUTO_MIGRATION_VERSION,
             "settings": self.settings,
             "quick_shifts": self.quick_shifts,
             "data": self.data,
@@ -489,14 +567,23 @@ class SDAEngine:
 
     def apply_payload(self, payload):
         content = payload or {}
-        self.settings, upgraded_settings = self.normalize_settings(content.get("settings"))
+        self.settings, upgraded_settings = self.normalize_settings(content.get("settings"), content.get("settings_version"))
         self.needs_save = self.needs_save or upgraded_settings
+        self.settings_version = CURRENT_SETTINGS_VERSION
+        try:
+            self.festivo_goduto_migration_version = int(content.get("festivo_goduto_migration_version") or 0)
+        except (TypeError, ValueError):
+            self.festivo_goduto_migration_version = 0
         self.quick_shifts = self.sanitize_quick_shifts(content.get("quick_shifts"))
         self.data = content.get("data", [])
         for entry in self.data:
             self.normalize_entry_flags(entry)
             entry["detail"] = entry.get("detail", {}) or {}
             entry["detail_minutes"] = self.get_detail_minutes(entry)
+        if self.festivo_goduto_migration_version < FESTIVO_GODUTO_MIGRATION_VERSION:
+            self.migrate_auto_festivo_goduto()
+            self.needs_save = True
+            self.festivo_goduto_migration_version = FESTIVO_GODUTO_MIGRATION_VERSION
 
     def save_data(self):
         if DB_MODE and self.user_email:
@@ -815,6 +902,15 @@ def month_year_from_request():
     return max(1, min(12, month)), max(1900, min(3000, year))
 
 
+def year_from_request():
+    today = date.today()
+    try:
+        year = int(request.args.get("year", today.year))
+    except (TypeError, ValueError):
+        year = today.year
+    return max(1900, min(3000, year))
+
+
 bootstrap_data_root()
 
 
@@ -1025,7 +1121,7 @@ def apple_touch_icon():
 @app.get("/service-worker.js")
 def service_worker():
     script = """
-const CACHE_NAME = "sda-pwa-v8";
+const CACHE_NAME = "sda-pwa-v9";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
@@ -1211,6 +1307,27 @@ def api_state():
             "view": view,
             "quick_shifts": engine.quick_shifts,
             "settings": engine.settings,
+            "viewer_email": current_user["email"],
+            "viewing_email": target_email,
+            "can_edit": can_edit,
+        }
+    )
+
+
+@app.get("/api/vacations")
+@login_required(approved_only=True)
+def api_vacations():
+    current_user = g.current_user
+    target_email, can_edit = resolve_view_user(current_user)
+    year = year_from_request()
+    with lock:
+        engine = get_engine_for(target_email)
+        vacations = engine.build_vacation_view(year)
+    return jsonify(
+        {
+            "ok": True,
+            "year": year,
+            "vacations": vacations,
             "viewer_email": current_user["email"],
             "viewing_email": target_email,
             "can_edit": can_edit,
