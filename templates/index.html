@@ -109,6 +109,39 @@
         </div>
       </section>
 
+      <section id="screen-ferie" class="screen">
+        <header class="screen-head">
+          <h1>Ferie</h1>
+          <p class="sub">Traccia i giorni usati durante l'anno</p>
+        </header>
+
+        <div class="month-nav">
+          <button id="vacation-prev" class="icon-btn" aria-label="Anno precedente">&#8249;</button>
+          <div id="vacation-year-label" class="month-label">Anno</div>
+          <button id="vacation-next" class="icon-btn" aria-label="Anno successivo">&#8250;</button>
+        </div>
+
+        <div class="profile-stats">
+          <article class="stat-card stat-card-compact tone-success">
+            <span class="stat-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M5 19 19 5"/><path d="M8 6.5c1.6-1.6 4.4-1.6 6 0l1.5 1.5"/><path d="M15.5 17.5c-1.6 1.6-4.4 1.6-6 0L8 16"/></svg>
+            </span>
+            <strong id="vacation-total-days" class="stat-value-small">0</strong>
+            <span class="stat-label">Giorni ferie</span>
+          </article>
+          <article class="stat-card stat-card-compact tone-cyan">
+            <span class="stat-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="14" rx="3"/><path d="M8 3.5v4"/><path d="M16 3.5v4"/><path d="M4 9.5h16"/></svg>
+            </span>
+            <strong id="vacation-months-used" class="stat-value-small">0</strong>
+            <span class="stat-label">Mesi coinvolti</span>
+          </article>
+        </div>
+
+        <div id="vacation-months" class="vacation-months"></div>
+        <div id="vacation-list" class="vacation-list"></div>
+      </section>
+
       <section id="screen-admin" class="screen">
         <header class="screen-head">
           <h1>Pannello Admin</h1>
@@ -215,6 +248,10 @@
       <button class="nav-btn" data-screen="screen-paghe">
         <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h13A2.5 2.5 0 0 1 21 7.5v9A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5z"/><path d="M3 9h18"/><circle cx="16.5" cy="14" r="1.5"/></svg></span>
         <small>Paghe</small>
+      </button>
+      <button class="nav-btn" data-screen="screen-ferie">
+        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 19 19 5"/><path d="M8 6.5c1.6-1.6 4.4-1.6 6 0l1.5 1.5"/><path d="M15.5 17.5c-1.6 1.6-4.4 1.6-6 0L8 16"/></svg></span>
+        <small>Ferie</small>
       </button>
       <button id="admin-nav-btn" class="nav-btn hidden" data-screen="screen-admin">
         <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l7 4v5c0 4.4-2.9 7.9-7 9-4.1-1.1-7-4.6-7-9V7z"/><path d="M9.5 12.5 11 14l3.5-4"/></svg></span>
