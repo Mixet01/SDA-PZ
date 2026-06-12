@@ -625,6 +625,8 @@ os.makedirs(USER_DATA_DIR, exist_ok=True)
 
 def default_user_payload():
     return {
+        "settings_version": CURRENT_SETTINGS_VERSION,
+        "festivo_goduto_migration_version": FESTIVO_GODUTO_MIGRATION_VERSION,
         "settings": copy.deepcopy(DEFAULT_SETTINGS),
         "quick_shifts": copy.deepcopy(DEFAULT_QUICK_SHIFTS),
         "data": [],
@@ -911,9 +913,6 @@ def year_from_request():
     return max(1900, min(3000, year))
 
 
-bootstrap_data_root()
-
-
 def normalize_email(value):
     return str(value or "").strip().lower()
 
@@ -1076,6 +1075,18 @@ def delete_user_everywhere(email):
         os.remove(path)
 
 
+def migrate_all_user_payloads():
+    registry = load_users_registry()
+    for user in registry.get("users", []):
+        email = normalize_email(user.get("email"))
+        if email:
+            get_engine_for(email)
+
+
+bootstrap_data_root()
+migrate_all_user_payloads()
+
+
 @app.get("/manifest.webmanifest")
 def manifest_webmanifest():
     icon = get_pwa_icon_descriptor()
@@ -1121,7 +1132,7 @@ def apple_touch_icon():
 @app.get("/service-worker.js")
 def service_worker():
     script = """
-const CACHE_NAME = "sda-pwa-v9";
+const CACHE_NAME = "sda-pwa-v11";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
