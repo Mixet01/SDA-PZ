@@ -38,7 +38,6 @@
     metricTotalHours: document.getElementById("metric-total-hours"),
     metricTotalShifts: document.getElementById("metric-total-shifts"),
     shiftList: document.getElementById("shift-list"),
-    fabAdd: document.getElementById("fab-add-turno"),
     shiftModal: document.getElementById("shift-modal"),
     modalClose: document.getElementById("modal-close"),
     shiftDate: document.getElementById("shift-date"),
@@ -212,7 +211,6 @@
 
   function setEditable(editable) {
     [
-      els.fabAdd,
       els.addShift,
       els.flagFestivo,
       els.flagFestivoGoduto,
@@ -609,7 +607,6 @@
     showGate("app");
     els.helloUser.textContent = `Ciao, ${state.me.name || "utente"}`;
     els.adminNavBtn.classList.toggle("hidden", !userIsAdmin());
-    els.bottomNav.classList.toggle("three", !userIsAdmin());
     if (!state.viewedUser) {
       state.viewedUser = state.me.email;
     }
@@ -629,6 +626,16 @@
     }
   }
 
+  async function refreshVacations() {
+    const params = new URLSearchParams({ year: String(state.vacationYear) });
+    if (userIsAdmin() && state.viewedUser && state.me && state.viewedUser !== state.me.email) {
+      params.set("view_user", state.viewedUser);
+    }
+    const data = await api(`/api/vacations?${params.toString()}`);
+    state.vacations = data.vacations || null;
+    renderVacations();
+  }
+
   async function guardedRefresh() {
     if (state.refreshInFlight || !state.me || !state.me.approved) return;
     if (document.hidden) return;
@@ -641,6 +648,9 @@
       await refreshMe();
       if (state.me && state.me.approved) {
         await refreshState();
+        if (state.activeScreen === "screen-ferie") {
+          await refreshVacations();
+        }
       }
       state.lastRefreshAt = Date.now();
     } catch (_err) {
@@ -681,6 +691,9 @@
     closeShiftModal();
     clearShiftForm();
     await refreshState();
+    if (state.vacations) {
+      await refreshVacations();
+    }
   }
 
   async function deleteShift(dateStr) {
@@ -688,6 +701,9 @@
     if (!confirm(`Eliminare il turno del ${dateStr}?`)) return;
     await api(`/api/entry/${encodeURIComponent(dateStr)}`, { method: "DELETE" });
     await refreshState();
+    if (state.vacations) {
+      await refreshVacations();
+    }
   }
 
   async function saveSettings() {
@@ -767,15 +783,37 @@
 
   function bindEvents() {
     els.navButtons.forEach((button) => {
-      button.addEventListener("click", () => setActiveScreen(button.dataset.screen));
+      button.addEventListener("click", async () => {
+        setActiveScreen(button.dataset.screen);
+        if (button.dataset.screen === "screen-ferie") {
+          try {
+            await refreshVacations();
+          } catch (err) {
+            alert(err.message);
+          }
+        }
+      });
     });
 
     els.monthPrev.addEventListener("click", () => shiftMonth(-1));
     els.monthNext.addEventListener("click", () => shiftMonth(1));
 
-    els.fabAdd.addEventListener("click", () => {
-      clearShiftForm();
-      openShiftModal();
+    els.vacationPrev.addEventListener("click", async () => {
+      state.vacationYear -= 1;
+      try {
+        await refreshVacations();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
+    els.vacationNext.addEventListener("click", async () => {
+      state.vacationYear += 1;
+      try {
+        await refreshVacations();
+      } catch (err) {
+        alert(err.message);
+      }
     });
 
     els.modalClose.addEventListener("click", closeShiftModal);

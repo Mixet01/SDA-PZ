@@ -388,7 +388,6 @@ select:focus {
 
 .stat-icon svg,
 .nav-icon svg,
-.fab svg,
 .trash-btn svg {
   width: 20px;
   height: 20px;
@@ -787,6 +786,70 @@ select:focus {
   color: var(--text);
 }
 
+.vacation-months {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.vacation-month {
+  min-height: 72px;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-faint);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.vacation-month.active {
+  color: var(--text);
+  border-color: rgba(39, 232, 157, 0.22);
+  background: rgba(39, 232, 157, 0.08);
+}
+
+.vacation-month span {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.vacation-month strong {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.vacation-list {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vacation-day {
+  padding: 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(15, 30, 54, 0.96) 0%, rgba(10, 20, 38, 0.96) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.vacation-day strong {
+  display: block;
+  font-size: 16px;
+}
+
+.vacation-day span {
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
 .bottom-nav {
   position: fixed;
   left: 50%;
@@ -794,7 +857,7 @@ select:focus {
   transform: translateX(-50%);
   width: min(500px, calc(100% - 18px));
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
   gap: 4px;
   padding: 10px 8px calc(10px + env(safe-area-inset-bottom));
   border-radius: var(--radius-lg);
@@ -804,10 +867,6 @@ select:focus {
   -webkit-backdrop-filter: blur(10px);
   box-shadow: 0 18px 36px rgba(0, 0, 0, 0.24);
   z-index: 40;
-}
-
-.bottom-nav.three {
-  grid-template-columns: repeat(3, 1fr);
 }
 
 .nav-btn {
@@ -863,31 +922,6 @@ select:focus {
 .nav-btn.active::after {
   background: var(--accent);
   box-shadow: 0 0 14px rgba(0, 209, 255, 0.5);
-}
-
-.fab {
-  position: fixed;
-  right: 18px;
-  bottom: 102px;
-  width: 52px;
-  height: 52px;
-  border: 0;
-  border-radius: 18px;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
-  color: #fff;
-  box-shadow: 0 16px 32px rgba(77, 163, 255, 0.34);
-  cursor: pointer;
-  z-index: 45;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform 0.16s ease, box-shadow 0.16s ease;
-}
-
-.fab:hover,
-.fab:focus-visible {
-  transform: translateY(-1px) scale(1.01);
-  box-shadow: 0 20px 34px rgba(77, 163, 255, 0.4);
 }
 
 .modal {
